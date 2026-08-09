@@ -1,6 +1,7 @@
 # backend/app/scrapers/base_scraper.py
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -28,6 +29,14 @@ class BaseScraper(ABC):
         filepath = os.path.join(self.screenshot_dir, filename)
         with open(filepath, "wb") as f:
             f.write(page_bytes)
+        return filepath
+
+    def save_json_artifact(self, payload: Dict[str, Any], prefix: str = "evidence") -> str:
+        """Saves structured JSON payloads to disk next to screenshots."""
+        filename = f"{prefix}_{self.channel_id}_{uuid.uuid4().hex[:8]}.json"
+        filepath = os.path.join(self.screenshot_dir, filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
         return filepath
 
     def build_result(

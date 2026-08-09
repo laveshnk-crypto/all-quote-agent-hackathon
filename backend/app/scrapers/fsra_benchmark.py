@@ -1,5 +1,6 @@
 # backend/app/scrapers/fsra_benchmark.py
-from typing import Dict, Any
+import re
+from typing import Dict, Any, List
 from playwright.async_api import async_playwright
 from app.scrapers.base_scraper import BaseScraper
 
@@ -7,6 +8,48 @@ class FSRABenchmarkScraper(BaseScraper):
     channel_id = "fsra_regulatory_benchmark"
     channel_name = "FSRA Regulator Rate Ranger"
     channel_category = "Regulatory"
+
+    @staticmethod
+    def _extract_result_payload(table_cells: List[str]) -> Dict[str, Any]:
+        cleaned_cells = [cell.strip() for cell in table_cells if cell and cell.strip() and cell.strip() != "---"]
+        normalized = [re.sub(r"\s+", " ", cell) for cell in cleaned_cells]
+
+        sections = {
+            "mandatory_coverage": {
+                "name": "Mandatory coverage",
+                "description": "",
+                "values": [],
+            },
+            "full_coverage": {
+                "name": "Full coverage",
+                "description": "",
+                "values": [],
+            },
+        }
+
+        current_section = None
+        for cell in normalized:
+            lowered = cell.lower()
+            if re.match(r"^mandatory coverage", lowered):
+                current_section = "mandatory_coverage"
+                description = re.sub(r"^mandatory coverage", "", cell, flags=re.IGNORECASE).strip()
+                sections[current_section]["description"] = description or "Mandatory coverage"
+                continue
+            if re.match(r"^full coverage", lowered):
+                current_section = "full_coverage"
+                description = re.sub(r"^full coverage", "", cell, flags=re.IGNORECASE).strip()
+                sections[current_section]["description"] = description or "Full coverage"
+                continue
+            if current_section and cell:
+                sections[current_section]["values"].append(cell)
+
+        result = {
+            "raw_cells": normalized,
+            "mandatory_coverage": sections["mandatory_coverage"],
+            "full_coverage": sections["full_coverage"],
+        }
+
+        return result
 
     async def execute(self, applicant_data: Dict[str, Any]) -> Dict[str, Any]:
         url = "https://regulatorrateranger.fsrao.ca/"
@@ -140,13 +183,14 @@ class FSRABenchmarkScraper(BaseScraper):
 
                 # 6. Extract rates from table DOM
                 table_cells = await page.locator("table tbody tr td").all_text_contents()
-                cleaned_rates = [cell.strip() for cell in table_cells if cell.strip() and cell.strip() != "---"]
+                result_payload = self._extract_result_payload(table_cells)
+                result_file_path = self.save_json_artifact(result_payload, prefix="fsra_results")
 
                 await browser.close()
 
                 return self.build_result(
                     status="SUCCESS",
-                    annual_premium=2150.00,  # Average benchmark anchor
+                    annual_premium=None,
                     evidence_summary=f"FSRA Rate Ranger calculation executed successfully for FSA {fsa}.",
                     evidence_payload={
                         "target_url": url,
@@ -155,7 +199,8 @@ class FSRABenchmarkScraper(BaseScraper):
                         "age_bucket": age_bucket,
                         "mileage_bucket": mileage_bucket,
                         "vehicle_year_bucket": vehicle_year_bucket,
-                        "extracted_table_data": cleaned_rates
+                        "results": result_payload,
+                        "results_file_path": result_file_path,
                     },
                     screenshot_path=screenshot_path
                 )
