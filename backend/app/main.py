@@ -39,3 +39,10 @@ async def startup():
 @app.get("/")
 def read_root():
     return {"status": "online", "system": "Ontario Auto Insurance Agent API"}
+
+
+@app.post("/fsra/quote")
+async def create_fsra_quote(payload: FSRARequest) -> Dict[str, Any]:
+    scraper = FSRABenchmarkScraper()
+    result = await scraper.execute(payload.dict())
+    return result
