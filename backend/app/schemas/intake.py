@@ -38,3 +38,16 @@ class ApplicantCreate(BaseModel):
     est_kilometres_driven_one_way_per_day: int = Field(..., example=20)
     est_kilometres_driven_per_year: int = Field(..., example=15000)
     
+    # Coverage
+    comprehensive_coverage: bool = Field(..., example=True)
+    collision_coverage: bool = Field(..., example=True)
+    
+    # Driving record
+    license_class: str = Field(..., example="G")
+    years_licensed: int = Field(..., example=5)
+    driving_record: DrivingRecordSchema = Field(default_factory=DrivingRecordSchema)
+    
+class ApplicantResponse(ApplicantCreate):
+    id: str
+    
+    model_config = ConfigDict(from_attributes=True)  # This allows Pydantic to read from ORM models directly

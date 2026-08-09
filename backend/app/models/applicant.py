@@ -51,3 +51,5 @@ class Applicant(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(datetime.timezone.utc), nullable=False)
     
     quote_runs = relationship("QuoteRun", back_populates="applicant", cascade="all, delete-orphan")
+    
+    
