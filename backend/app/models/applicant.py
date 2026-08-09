@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from sqlalchemy import String, Integer, Date, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -48,7 +48,7 @@ class Applicant(Base):
     years_licensed: Mapped[int] = mapped_column(Integer, nullable=False)
     driving_history: Mapped[dict] = mapped_column(JSON, nullable=True)  # e.g., {"tickets": 2, "claims": 1}
     
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(datetime.timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     quote_runs = relationship("QuoteRun", back_populates="applicant", cascade="all, delete-orphan")
     

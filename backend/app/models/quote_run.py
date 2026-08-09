@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Numeric, DateTime, JSON, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -32,6 +32,6 @@ class QuoteRun(Base):
     evidence_payload: Mapped[dict] = mapped_column(JSON, nullable=True)
     screenshot_path: Mapped[str] = mapped_column(String(255), nullable=True)
     
-    executed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(datetime.timezone.utc), nullable=False)
+    executed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     applicant = relationship("Applicant", back_populates="quote_runs")
