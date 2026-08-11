@@ -8,11 +8,12 @@ __pycache__/
 venv/
 env/
 ENV/
-backend/__pycache__/
-backend/venv/
-backend/.venv/
+*.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 
 # Environment files
@@ -21,19 +22,41 @@ htmlcov/
 !.env.example
 
 # Node / frontend
-frontend/node_modules/
-frontend/dist/
-frontend/build/
-frontend/.vite/
+node_modules/
+dist/
+build/
+.vite/
+*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+.next/
+out/
+*.tsbuildinfo
+.turbo/
+.eslintcache
+*.swc
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Scraper / debug artifacts
+screenshots/
+*_debug.html
+*_debug.txt
+page_debug.html
+selects_debug.txt
 
 # OS / editor
 .DS_Store
+Thumbs.db
 .vscode/
 .idea/
-
-# Scraper artifacts
-backend/app/scrapers/screenshots/
-EOF
+*.swp
