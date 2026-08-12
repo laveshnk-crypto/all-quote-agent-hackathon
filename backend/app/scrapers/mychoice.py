@@ -81,7 +81,10 @@ class MyChoiceScraper(BaseScraper):
         try:
             async with self.browser_page() as page:
                 response = await page.goto(self.url, wait_until="domcontentloaded", timeout=40000)
-                await page.wait_for_timeout(3000)
+                try:
+                    await page.wait_for_selector("select", timeout=15000)
+                except Exception:
+                    await page.wait_for_timeout(1200)
                 steps.append(f"loaded ({response.status if response else '?'})")
 
                 selects = page.locator("select")
@@ -97,13 +100,43 @@ class MyChoiceScraper(BaseScraper):
 
                 await choose(0, year, "vehicle_year")
                 await choose(1, make, "vehicle_make")
-                await page.wait_for_timeout(1800)  # model list is populated by make
-                # Model barely moves the estimate; take the first real option.
+                # The make <select> is React-controlled: setting it through the
+                # DOM does not always reach the handler that fills the model list,
+                # so nudge it with the events React actually listens for.
                 try:
-                    await selects.nth(2).select_option(index=1, timeout=8000)
-                    steps.append("vehicle_model=first available")
+                    await selects.nth(1).evaluate(
+                        "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
+                        " el.dispatchEvent(new Event('change', {bubbles:true})); }"
+                    )
                 except Exception:
-                    steps.append("vehicle_model skipped")
+                    pass
+                try:
+                    await page.wait_for_function(
+                        "() => document.querySelectorAll('select')[2]?.options.length > 1",
+                        timeout=5000,
+                    )
+                except Exception:
+                    pass  # model stays optional; the estimate still computes without it
+                # Model does move the estimate, so blindly taking the first option
+                # made the same profile return different numbers run to run. Match
+                # the applicant's model when the site offers it.
+                wanted = str(applicant_data.get("vehicle_model") or "").strip()
+                chosen = None
+                try:
+                    options = await selects.nth(2).locator("option").all_text_contents()
+                    real = [o.strip() for o in options if o.strip() and "select" not in o.lower()]
+                    if wanted:
+                        chosen = next(
+                            (o for o in real if wanted.lower() in o.lower()), None
+                        )
+                    chosen = chosen or (real[0] if real else None)
+                    if chosen:
+                        await selects.nth(2).select_option(label=chosen, timeout=8000)
+                        steps.append(f"vehicle_model={chosen}")
+                    else:
+                        steps.append("vehicle_model: no options")
+                except Exception as exc:
+                    steps.append(f"vehicle_model FAILED: {str(exc)[:60]}")
 
                 await choose(3, band, "age_band")
 
@@ -135,6 +168,8 @@ class MyChoiceScraper(BaseScraper):
                 except Exception as exc:
                     steps.append(f"postal FAILED: {str(exc)[:60]}")
 
+                await self.capture_entry(page, "form")
+
                 try:
                     await page.get_by_role(
                         "button", name=re.compile(r"See How Much", re.I)
@@ -143,7 +178,17 @@ class MyChoiceScraper(BaseScraper):
                 except Exception as exc:
                     steps.append(f"submit FAILED: {str(exc)[:60]}")
 
-                await page.wait_for_timeout(4500)
+                # The results block renders client-side; waiting for it beats a
+                # fixed sleep that is either too short to be safe or too long to
+                # be fast. Falls back to a short settle if the label never shows.
+                try:
+                    await page.get_by_text("Your Results", exact=False).first.wait_for(
+                        timeout=9000
+                    )
+                    await page.wait_for_timeout(400)
+                except Exception:
+                    await page.wait_for_timeout(1500)
+
                 text = await page.inner_text("body")
 
                 # Results block renders as label/value pairs: "Fair benchmark" then

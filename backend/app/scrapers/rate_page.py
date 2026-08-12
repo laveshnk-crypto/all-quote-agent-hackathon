@@ -62,6 +62,16 @@ class RatePageScraper(BaseScraper):
             urls.append(self.fallback_url)
         return urls
 
+    #: Where this channel takes the applicant's location. Every one of these
+    #: sites has a quote box; typing into it is the entry step we screenshot.
+    postal_selectors: List[str] = [
+        "#postal-code",
+        "#postal_code",
+        "#postal-code-input",
+        "input[name='postal_code']",
+        "input[placeholder*='postal' i]",
+    ]
+
     @abstractmethod
     def parse(
         self, text: str, tables: List[List[str]], applicant_data: Dict[str, Any]
@@ -71,6 +81,32 @@ class RatePageScraper(BaseScraper):
         ``annual_premium`` must be ``None`` when the page carries no figure for
         this profile; never fall back to a nominal value.
         """
+
+    async def enter_profile(self, page, applicant_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Type the applicant's details into this site's own quote form.
+
+        The base implementation fills the postal code, which is the one input
+        every one of these sites exposes without demanding a name and phone
+        number. Channels with a real multi-step funnel override this.
+        """
+        postal = str(applicant_data.get("postal_code") or "").strip().upper()
+        if not postal:
+            return {"entered": {}, "note": "no postal code to enter"}
+
+        for selector in self.postal_selectors:
+            try:
+                # `:visible` skips the duplicate inputs these sites hide in
+                # collapsed mobile headers, which is what fill() was hitting.
+                field = page.locator(f"{selector}:visible").first
+                await field.scroll_into_view_if_needed(timeout=2500)
+                await field.fill(postal, timeout=3500)
+                await page.wait_for_timeout(350)
+                await self.capture_entry(page, "postal")
+                return {"entered": {"postal_code": postal}, "selector": selector}
+            except Exception:
+                continue
+
+        return {"entered": {}, "note": "no postal input found on this page"}
 
     async def execute(self, applicant_data: Dict[str, Any]) -> Dict[str, Any]:
         missing = self.missing_fields(applicant_data)
@@ -102,7 +138,7 @@ class RatePageScraper(BaseScraper):
                             url, wait_until="domcontentloaded", timeout=40000
                         )
                         status_code = response.status if response else None
-                        await page.wait_for_timeout(3000)
+                        await page.wait_for_timeout(2200)
                     except Exception as exc:  # navigation/timeout on this candidate
                         attempts.append({"url": url, "error": str(exc)[:160]})
                         continue
@@ -134,12 +170,19 @@ class RatePageScraper(BaseScraper):
                         page, amount=parsed["annual_premium"]
                     )
 
+                    # Entry runs last because a real funnel navigates away from the
+                    # rate page, and the result screenshot has to be taken while
+                    # we are still standing on the figure it proves.
+                    entry = await self.enter_profile(page, applicant_data)
+
                     payload = {
                         "source_url": url,
                         "attempts": attempts,
                         "headline": parsed.get("headline"),
                         "comparisons": parsed.get("comparisons", []),
                         "matched_on": parsed.get("matched_on"),
+                        "entered": entry.get("entered", {}),
+                        "entry_note": entry.get("note"),
                         "applicant_profile": applicant_data,
                     }
                     payload["results_file_path"] = self.save_json_artifact(

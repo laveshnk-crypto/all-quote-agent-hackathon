@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useDataChannel, useRoomContext, useVoiceAssistant } from '@livekit/components-react';
 
 import QuoteCarousel from './QuoteCarousel.jsx';
@@ -81,15 +81,20 @@ function QuoteForm({ fields, values, onChange, onSubmit, busy }) {
   );
 }
 
-function QuoteLoading({ channels = [] }) {
-  // Channels run in parallel, so rather than fake a sequence we light each one
-  // up in turn to show the fan-out is live.
-  const [tick, setTick] = useState(0);
+const money = (value) =>
+  typeof value === 'number'
+    ? new Intl.NumberFormat('en-CA', {
+        style: 'currency',
+        currency: 'CAD',
+        maximumFractionDigits: 0,
+      }).format(value)
+    : null;
 
-  useEffect(() => {
-    const id = setInterval(() => setTick((value) => value + 1), 900);
-    return () => clearInterval(id);
-  }, []);
+function QuoteLoading({ channels = [], done = 0, total = 0, landed = [] }) {
+  // Each channel reports as it lands, so the list resolves in place rather than
+  // animating a fake sequence. Anything not yet reported stays pending.
+  const byName = new Map(landed.map((q) => [q.channel_name, q]));
+  const pct = total ? Math.round((done / total) * 100) : 0;
 
   return (
     <div className="quote-card quote-loading">
@@ -98,21 +103,35 @@ function QuoteLoading({ channels = [] }) {
         <span />
         <span />
       </div>
-      <h2>Checking {channels.length || 'all'} sources</h2>
-      <p className="quote-loading__step">Querying every source at once…</p>
+      <h2>Checking {total || channels.length || 'all'} sources</h2>
+      <p className="quote-loading__step">
+        {done > 0 ? `${done} of ${total} back` : 'Entering your details on each site…'}
+      </p>
 
       {channels.length > 0 && (
         <ul className="quote-loading__channels">
-          {channels.map((name, index) => (
-            <li key={name} className={index === tick % channels.length ? 'is-active' : ''}>
-              {name}
-            </li>
-          ))}
+          {channels.map((name) => {
+            const hit = byName.get(name);
+            const priced = hit && typeof hit.annual_premium === 'number';
+            return (
+              <li
+                key={name}
+                className={hit ? (priced ? 'is-done' : 'is-empty') : 'is-pending'}
+              >
+                {name}
+                {priced && <b>{money(hit.annual_premium)}</b>}
+                {hit && !priced && <b>—</b>}
+              </li>
+            );
+          })}
         </ul>
       )}
 
       <div className="quote-loading__track" aria-hidden="true">
-        <div className="quote-loading__bar" />
+        <div
+          className={total ? 'quote-loading__bar is-determinate' : 'quote-loading__bar'}
+          style={total ? { width: `${pct}%` } : undefined}
+        />
       </div>
     </div>
   );
@@ -125,6 +144,8 @@ export default function QuoteExperience() {
   const [values, setValues] = useState({});
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState('cards');
+  const [landed, setLanded] = useState([]);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
 
   useDataChannel(QUOTE_UI_TOPIC, (msg) => {
     let payload;
@@ -135,7 +156,22 @@ export default function QuoteExperience() {
       return;
     }
 
+    if (payload.phase === 'progress') {
+      // Progress messages update the loading list without replacing the phase.
+      setProgress({ done: payload.done, total: payload.total });
+      setLanded((prev) =>
+        prev.some((q) => q.channel_id === payload.quote.channel_id)
+          ? prev
+          : [...prev, payload.quote],
+      );
+      return;
+    }
+
     setUi(payload);
+    if (payload.phase === 'loading') {
+      setLanded([]);
+      setProgress({ done: 0, total: (payload.channels ?? []).length });
+    }
     if (payload.phase === 'result') setView('cards');
     if (payload.phase === 'form') {
       setValues(payload.values ?? {});
@@ -190,7 +226,14 @@ export default function QuoteExperience() {
           />
         );
       case 'loading':
-        return <QuoteLoading channels={ui.channels} />;
+        return (
+          <QuoteLoading
+            channels={ui.channels}
+            done={progress.done}
+            total={progress.total || (ui.channels ?? []).length}
+            landed={landed}
+          />
+        );
       case 'result':
         return view === 'table' ? (
           <QuoteTable
@@ -217,7 +260,7 @@ export default function QuoteExperience() {
       default:
         return null;
     }
-  }, [ui, values, busy, view, handleChange, handleSubmit]);
+  }, [ui, values, busy, view, landed, progress, handleChange, handleSubmit]);
 
   if (!body) return null;
 

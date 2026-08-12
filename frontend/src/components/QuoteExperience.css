@@ -320,3 +320,35 @@
   font-size: 11px;
   opacity: 0.7;
 }
+
+/* Per-channel state while the fan-out runs. */
+.quote-loading__channels li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.quote-loading__channels li.is-pending {
+  opacity: 0.5;
+}
+
+.quote-loading__channels li.is-done {
+  color: var(--text-h);
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+
+.quote-loading__channels li.is-done b {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.quote-loading__channels li.is-empty b {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.quote-loading__bar.is-determinate {
+  animation: none;
+  transition: width 0.4s ease;
+}

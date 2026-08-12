@@ -167,7 +167,10 @@ class FSRABenchmarkScraper(BaseScraper):
         screenshot_path = None
         try:
             async with self.browser_page() as page:
-                await page.goto(url, wait_until="networkidle", timeout=40000)
+                # networkidle waits for third-party beacons that never settle;
+                # the form is usable as soon as its first react-select mounts.
+                await page.goto(url, wait_until="domcontentloaded", timeout=40000)
+                await page.wait_for_selector("#react-select-2-input", timeout=25000)
 
                 async def fill_react_select(selector_id: str, search_text: str):
                     locator = page.locator(selector_id)
@@ -188,6 +191,9 @@ class FSRABenchmarkScraper(BaseScraper):
                 await fill_react_select("#react-select-10-input", str(years_claim_free))
                 await fill_react_select("#react-select-11-input", multi_vehicle_discount_display)
                 await fill_react_select("#react-select-12-input", multi_policy_discount_display)
+
+                # Proof the applicant's own answers went into FSRA's form.
+                await self.capture_entry(page, "form")
 
                 await page.locator("button:has-text('Calculate')").click()
                 await page.wait_for_timeout(2500)

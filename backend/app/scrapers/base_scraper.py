@@ -27,9 +27,14 @@ class BaseScraper(ABC):
     # quietly substituting a placeholder, which would produce a fake quote.
     required_fields: List[str] = []
 
-    def __init__(self, screenshot_dir: str = "app/scrapers/screenshots"):
+    def __init__(self, screenshot_dir: str = "app/scrapers/screenshots", pool=None):
         self.screenshot_dir = screenshot_dir
         os.makedirs(self.screenshot_dir, exist_ok=True)
+        #: Shared BrowserPool. Without one the channel launches its own browser,
+        #: which is correct but ten times more expensive across a full run.
+        self.pool = pool
+        #: Screenshots taken while filling this channel's form, in order.
+        self.entry_shots: List[str] = []
 
     @abstractmethod
     async def execute(self, applicant_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -60,17 +65,78 @@ class BaseScraper(ABC):
 
     @asynccontextmanager
     async def browser_page(self, *, headless: bool = True):
-        """Chromium page with a desktop UA. These sites 403 plain HTTP clients."""
+        """Chromium page with a desktop UA. These sites 403 plain HTTP clients.
+
+        Uses the shared pool when the registry supplied one; falls back to a
+        private browser so a channel can still be run on its own in a test.
+        """
+        if self.pool is not None:
+            async with self.pool.page() as page:
+                yield page
+            return
+
         from playwright.async_api import async_playwright
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=headless)
             try:
-                context = await browser.new_context(user_agent=USER_AGENT, locale="en-CA")
+                context = await browser.new_context(
+                    user_agent=USER_AGENT,
+                    locale="en-CA",
+                    viewport={"width": 1280, "height": 900},
+                )
                 page = await context.new_page()
                 yield page
             finally:
                 await browser.close()
+
+    async def capture_entry(self, page, label: str) -> Optional[str]:
+        """Screenshot the form we just filled, as proof the data was entered.
+
+        Distinct from the result screenshot: this shows *our* answers sitting in
+        the site's own fields, before anything is calculated.
+        """
+        path = await self.capture(page, suffix=f"entry_{label}")
+        if path:
+            self.entry_shots.append(path)
+        return path
+
+    @staticmethod
+    async def set_select(page, selector: str, value: str, *, by: str = "label") -> bool:
+        """Best-effort <select> set. Returns whether it took."""
+        try:
+            locator = page.locator(selector).first
+            if by == "label":
+                await locator.select_option(label=value, timeout=6000)
+            elif by == "value":
+                await locator.select_option(value=value, timeout=6000)
+            else:
+                await locator.select_option(index=int(value), timeout=6000)
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def nearest_option(options: List[str], target: float) -> Optional[str]:
+        """Pick the option whose embedded number is closest to `target`.
+
+        Sites express the same answer in incompatible buckets ("10,000 KM",
+        "10-15k"); matching on the number rather than the string keeps one
+        applicant answer usable across all of them.
+        """
+        best, best_gap = None, float("inf")
+        for option in options:
+            match = re.search(r"[\d,]+", option)
+            if not match:
+                continue
+            try:
+                value = float(match.group().replace(",", ""))
+            except ValueError:
+                continue
+            gap = abs(value - target)
+            if gap < best_gap:
+                best, best_gap = option, gap
+        return best
 
     async def focus_on_amount(self, page, amount: Optional[float]) -> bool:
         """Scroll the reported figure into view so the screenshot actually shows it.
@@ -177,12 +243,15 @@ class BaseScraper(ABC):
             "evidence_summary": evidence_summary,
             "evidence_payload": evidence_payload or {},
             "screenshot_path": screenshot_path,
-            # Browser-facing URL for the same file, so the UI can show proof.
+            # Browser-facing URLs for the same files, so the UI can show proof.
             "screenshot_url": (
                 f"{ARTIFACT_URL_PREFIX}/{os.path.basename(screenshot_path)}"
                 if screenshot_path
                 else None
             ),
+            "entry_screenshot_urls": [
+                f"{ARTIFACT_URL_PREFIX}/{os.path.basename(p)}" for p in self.entry_shots
+            ],
             "executed_at": datetime.now(timezone.utc).isoformat(),
         }
 

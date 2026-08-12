@@ -46,16 +46,26 @@ rate index), HelloSafe.ca, Surex.com and isure.ca.
 You are on a voice call. Everything you say is spoken aloud.
 
 Workflow:
-1. Introduce yourself as an insurance agent and say you will check ten sources to show them
-   what drivers with their profile actually pay.
-2. Collect these details, one question at a time. Group the natural pairs into a single
-   question so this doesn't drag: date of birth; gender; marital status; postal code and
-   city; vehicle year, make and model; kilometres per year; years licensed; years
-   claim-free; at-fault accidents in the last 6 years; tickets or convictions in the last 3
-   years; what they pay per month today; multi-vehicle and multi-policy discounts.
-   - Ask for city as well as postal code; several sources publish rates per city.
-   - For what they pay today, make clear it's optional and that saying "not insured yet" or
-     "not sure" is fine. One source is skipped without it; the other nine still run.
+1. Introduce yourself as an insurance agent and you are here to help the user compare insurance rates in order to get the best possible auto quotes..
+2. Collect these details. Group related ones into a single question so this doesn't drag --
+   aim for about ten questions, not twenty-four:
+   - date of birth, gender, marital status
+   - postal code and city (several sources publish rates per city)
+   - vehicle year, make and model
+   - whether it's owned outright, financed or leased
+   - where it's parked overnight (garage, driveway, underground, parking lot, street, carport)
+   - whether it has, or they plan to install, an anti-theft device
+   - primary use: personal or business driving
+   - kilometres per year, and the one-way daily commute
+   - years licensed, years claim-free, at-fault accidents in 6 years, tickets in 3 years
+   - whether they put winter tires on each season
+   - whether they want comprehensive and collision cover, or liability only
+   - what they pay per month today
+   - multi-vehicle and multi-policy discounts
+   - For what they pay today, make clear it's optional and that "not insured yet" or "not
+     sure" is fine. One source is skipped without it; the other nine still run.
+   - Parking, anti-theft, ownership and commute are typed straight into the sources' own
+     quote forms, so they change the numbers -- they aren't box-ticking.
 3. As soon as you have all of the above, call the get_insurance_quote tool. Do not read the
    details back verbally first. The tool puts an editable form on the user's screen and waits
    for them to review it, which is how confirmation happens.
@@ -74,6 +84,8 @@ Style rules:
 Tooling:
 - get_insurance_quote handles the on-screen confirmation form, the loading state, and the
   results carousel. You do not need to describe any of that; the user can see it.
+- Results appear on screen one source at a time as each finishes, so the user is not
+  staring at a blank screen. Do not narrate them arriving.
 - The tool blocks while the user reviews the form and then for a minute or two while all ten
   sources run in parallel. Stay quiet during that time.
 - If the tool reports an error, explain it plainly and offer to correct a detail and retry.
@@ -133,6 +145,51 @@ FORM_FIELDS = [
         "type": "number",
         "optional": True,
         "hint": "Leave blank if you're not insured yet",
+    },
+    {
+        "key": "overnight_parking",
+        "label": "Where it parks overnight",
+        "type": "select",
+        "options": ["Garage", "Driveway", "Underground", "Parking Lot", "Street", "Carport"],
+    },
+    {
+        "key": "primary_use",
+        "label": "Primary use",
+        "type": "select",
+        "options": ["Personal", "Business"],
+    },
+    {
+        "key": "financed_or_leased",
+        "label": "Ownership",
+        "type": "select",
+        "options": ["Owned", "Financed", "Leased"],
+    },
+    {
+        "key": "daily_commute_km",
+        "label": "One-way commute (km/day)",
+        "type": "number",
+        "optional": True,
+        "hint": "0 if you don't commute",
+    },
+    {
+        "key": "anti_theft_device",
+        "label": "Anti-theft device installed",
+        "type": "boolean",
+    },
+    {
+        "key": "winter_tires",
+        "label": "Winter tires each season",
+        "type": "boolean",
+    },
+    {
+        "key": "comprehensive_coverage",
+        "label": "Wants comprehensive coverage",
+        "type": "boolean",
+    },
+    {
+        "key": "collision_coverage",
+        "label": "Wants collision coverage",
+        "type": "boolean",
     },
     {
         "key": "multi_vehicle_discount",
@@ -334,8 +391,18 @@ class DefaultAgent(Agent):
         years_claim_free: int,
         at_fault_accidents: int,
         tickets_convictions: int,
+        overnight_parking: Literal[
+            "Garage", "Driveway", "Underground", "Parking Lot", "Street", "Carport"
+        ],
+        primary_use: Literal["Personal", "Business"],
+        financed_or_leased: Literal["Owned", "Financed", "Leased"],
+        anti_theft_device: bool,
         vehicle_model: str = "",
         current_monthly_premium: int = 0,
+        daily_commute_km: int = 0,
+        winter_tires: bool = False,
+        comprehensive_coverage: bool = True,
+        collision_coverage: bool = True,
         multi_vehicle_discount: bool = False,
         multi_policy_discount: bool = False,
     ) -> Dict[str, Any]:
@@ -365,6 +432,15 @@ class DefaultAgent(Agent):
             current_monthly_premium: What the driver pays per month today, in dollars.
                 0 if they are not insured yet or do not know; one channel needs this to
                 benchmark them and is skipped without it.
+            overnight_parking: Where the vehicle sits overnight. Sites price a garage
+                very differently from street parking.
+            primary_use: Whether the car is used for personal or business driving.
+            financed_or_leased: Whether the vehicle is owned outright, financed, or leased.
+            anti_theft_device: True if an anti-theft or tracking device is installed.
+            daily_commute_km: One-way commute distance in km. 0 if they don't commute.
+            winter_tires: True if winter tires go on each season; several insurers discount it.
+            comprehensive_coverage: True if they want comprehensive cover.
+            collision_coverage: True if they want collision cover.
             multi_vehicle_discount: True if more than one vehicle is insured with the same company.
             multi_policy_discount: True if another policy (home, tenant) is with the same company.
         """
@@ -383,6 +459,14 @@ class DefaultAgent(Agent):
             "at_fault_accidents": at_fault_accidents,
             "tickets_convictions": tickets_convictions,
             "current_monthly_premium": current_monthly_premium or None,
+            "overnight_parking": overnight_parking,
+            "primary_use": primary_use,
+            "financed_or_leased": financed_or_leased,
+            "daily_commute_km": daily_commute_km,
+            "anti_theft_device": anti_theft_device,
+            "winter_tires": winter_tires,
+            "comprehensive_coverage": comprehensive_coverage,
+            "collision_coverage": collision_coverage,
             "multi_vehicle_discount": multi_vehicle_discount,
             "multi_policy_discount": multi_policy_discount,
         }
@@ -422,6 +506,14 @@ class DefaultAgent(Agent):
             "at_fault_accidents": confirmed["at_fault_accidents"],
             "tickets_convictions": confirmed["tickets_convictions"],
             "current_monthly_premium": confirmed.get("current_monthly_premium"),
+            "overnight_parking": confirmed["overnight_parking"],
+            "primary_use": confirmed["primary_use"],
+            "financed_or_leased": confirmed["financed_or_leased"],
+            "daily_commute_km": confirmed.get("daily_commute_km"),
+            "anti_theft_device": confirmed["anti_theft_device"],
+            "winter_tires": confirmed["winter_tires"],
+            "comprehensive_coverage": confirmed["comprehensive_coverage"],
+            "collision_coverage": confirmed["collision_coverage"],
             "multi_vehicle_discount": confirmed["multi_vehicle_discount"],
             "multi_policy_discount": confirmed["multi_policy_discount"],
         }
@@ -436,7 +528,24 @@ class DefaultAgent(Agent):
         )
 
         logger.info("running all channels for profile: %s", applicant_data)
-        results = await run_all_channels(applicant_data, screenshot_dir=str(SCREENSHOT_DIR))
+
+        async def on_channel_done(result: Dict[str, Any], done: int, total: int) -> None:
+            # Push each card the moment its channel lands, so the screen fills in
+            # instead of holding a spinner until the slowest source returns.
+            await self._publish_ui(
+                {
+                    "phase": "progress",
+                    "done": done,
+                    "total": total,
+                    "quote": _quote_card(result),
+                }
+            )
+
+        results = await run_all_channels(
+            applicant_data,
+            screenshot_dir=str(SCREENSHOT_DIR),
+            on_result=on_channel_done,
+        )
         self.last_quote_results = results
 
         totals = summarise(results)

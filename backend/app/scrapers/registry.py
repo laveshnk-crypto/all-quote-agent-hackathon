@@ -10,9 +10,10 @@ this pipeline substitutes a nominal or example value for a missing answer.
 """
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Type
 
 from app.scrapers.base_scraper import BaseScraper
+from app.scrapers.browser import BrowserPool
 from app.scrapers.fsra_benchmark import FSRABenchmarkScraper
 from app.scrapers.hellosafe import HelloSafeScraper
 from app.scrapers.insurancehotline import InsuranceHotlineScraper
@@ -57,9 +58,15 @@ def channel_directory() -> List[Dict[str, Any]]:
 
 
 async def _run_one(
-    cls: Type[BaseScraper], applicant_data: Dict[str, Any], screenshot_dir: Optional[str]
+    cls: Type[BaseScraper],
+    applicant_data: Dict[str, Any],
+    screenshot_dir: Optional[str],
+    pool: Optional[BrowserPool] = None,
 ) -> Dict[str, Any]:
-    scraper = cls(screenshot_dir=screenshot_dir) if screenshot_dir else cls()
+    kwargs: Dict[str, Any] = {"pool": pool}
+    if screenshot_dir:
+        kwargs["screenshot_dir"] = screenshot_dir
+    scraper = cls(**kwargs)
     try:
         return await asyncio.wait_for(
             scraper.execute(applicant_data), timeout=CHANNEL_TIMEOUT_S
@@ -85,13 +92,34 @@ async def run_all_channels(
     *,
     screenshot_dir: Optional[str] = None,
     only: Optional[List[str]] = None,
+    on_result: Optional[Callable[[Dict[str, Any], int, int], Awaitable[None]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Run every channel concurrently and return all results, successes first."""
-    selected = [c for c in SCRAPERS if not only or c.channel_id in only]
+    """Run every channel concurrently and return all results, successes first.
 
-    results = await asyncio.gather(
-        *(_run_one(cls, applicant_data, screenshot_dir) for cls in selected)
-    )
+    ``on_result`` is awaited as each channel lands, so the UI can fill in
+    progressively instead of staring at a spinner until the slowest one
+    finishes. All channels share a single browser process.
+    """
+    selected = [c for c in SCRAPERS if not only or c.channel_id in only]
+    total = len(selected)
+    pool = BrowserPool()
+    results: List[Dict[str, Any]] = []
+
+    try:
+        pending = [
+            asyncio.create_task(_run_one(cls, applicant_data, screenshot_dir, pool))
+            for cls in selected
+        ]
+        for done in asyncio.as_completed(pending):
+            result = await done
+            results.append(result)
+            if on_result is not None:
+                try:
+                    await on_result(result, len(results), total)
+                except Exception:
+                    logger.exception("on_result callback failed for %s", result.get("channel_id"))
+    finally:
+        await pool.aclose()
 
     # Successes first, cheapest first within that; everything else keeps registry order.
     def sort_key(result: Dict[str, Any]) -> tuple:
