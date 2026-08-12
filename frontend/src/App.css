@@ -203,3 +203,77 @@
     border-right-color: var(--border);
   }
 }
+
+/* ---------- animated wordmark ---------- */
+
+.brand {
+  position: absolute;
+  top: clamp(28px, 8vh, 76px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-family: var(--heading);
+  font-size: clamp(30px, 6.5vw, 60px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.brand__word {
+  display: inline-block;
+}
+
+.brand__word--accent {
+  color: #c084fc;
+}
+
+.brand__word--light {
+  color: #f3f4f6;
+}
+
+.brand__char {
+  display: inline-block;
+  /* Entrance runs once; the shimmer starts after and loops forever. Listing the
+     shimmer second lets it win the text-shadow once the entrance has filled. */
+  opacity: 0;
+  animation:
+    brand-in 720ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    brand-shimmer 4.5s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 70ms), calc(900ms + var(--i) * 85ms);
+}
+
+@keyframes brand-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.9);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* A glow travelling letter to letter, so the wordmark keeps breathing. */
+@keyframes brand-shimmer {
+  0%,
+  70%,
+  100% {
+    text-shadow: none;
+  }
+  35% {
+    text-shadow:
+      0 0 18px rgba(192, 132, 252, 0.75),
+      0 0 42px rgba(192, 132, 252, 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand__char {
+    opacity: 1;
+    animation: none;
+  }
+}

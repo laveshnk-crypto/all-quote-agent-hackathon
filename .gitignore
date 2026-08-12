@@ -75,3 +75,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Scraper evidence artifacts (regenerated on every run)
+backend/app/scrapers/screenshots/

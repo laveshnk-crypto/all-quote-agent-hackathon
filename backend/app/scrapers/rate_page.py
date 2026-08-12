@@ -107,10 +107,9 @@ class RatePageScraper(BaseScraper):
                         attempts.append({"url": url, "error": str(exc)[:160]})
                         continue
 
-                    # Proof of what we looked at, whatever the outcome.
-                    screenshot_path = await self.capture(page)
-
                     if status_code and status_code >= 400:
+                        # Proof of what we looked at, even when it's a 404.
+                        screenshot_path = await self.capture(page)
                         attempts.append({"url": url, "http_status": status_code})
                         continue
 
@@ -126,7 +125,14 @@ class RatePageScraper(BaseScraper):
 
                     if parsed.get("annual_premium") is None:
                         # Page loaded but the numbers we key off weren't there.
+                        screenshot_path = await self.capture(page)
                         continue
+
+                    # Frame the figure we're about to report, so the screenshot
+                    # is evidence for this number rather than of the page's hero.
+                    screenshot_path = await self.capture(
+                        page, amount=parsed["annual_premium"]
+                    )
 
                     payload = {
                         "source_url": url,

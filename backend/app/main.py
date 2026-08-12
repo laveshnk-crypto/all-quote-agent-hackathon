@@ -8,9 +8,15 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.routers import token
 
 app = FastAPI(title="Ontario Auto Insurance Agent API")
+
+# Screenshot proof for each quote channel. The scrapers write here and hand the
+# UI a /artifacts/<file> URL so every figure can be checked against its source.
+ARTIFACT_DIR = Path(__file__).resolve().parent / "scrapers" / "screenshots"
+ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Setup CORS to allow your frontend on port 5174
 app.add_middleware(
@@ -28,6 +34,7 @@ app.add_middleware(
 )
 
 app.include_router(token.router)
+app.mount("/artifacts", StaticFiles(directory=str(ARTIFACT_DIR)), name="artifacts")
 
 @app.get("/")
 def read_root():

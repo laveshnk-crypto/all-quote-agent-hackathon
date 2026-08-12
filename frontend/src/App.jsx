@@ -4,6 +4,14 @@ import '@livekit/components-styles';
 
 import './App.css';
 import lucideBot from './assets/lucide--bot.svg';
+import QuoteExperience from './components/QuoteExperience.jsx';
+
+// Split so the two halves can carry different colour, and every letter gets its
+// own index for the staggered entrance and the shimmer that follows it.
+const BRAND = [
+  ['Omni', 'accent'],
+  ['Quote', 'light'],
+];
 
 export default function App() {
   const [token, setToken] = useState(null);
@@ -45,6 +53,23 @@ export default function App() {
       <div className="App">
         <div className="base"></div>
 
+        <h1 className="brand" aria-label="OmniQuote">
+          {BRAND.map(([text, tone], wordIndex) => (
+            <span className={`brand__word brand__word--${tone}`} key={text}>
+              {[...text].map((char, i) => (
+                <span
+                  className="brand__char"
+                  key={`${text}-${i}`}
+                  style={{ '--i': wordIndex * 4 + i }}
+                  aria-hidden="true"
+                >
+                  {char}
+                </span>
+              ))}
+            </span>
+          ))}
+        </h1>
+
         <button
           className={`logo-circle ${connected ? 'active' : ''}`}
           type="button"
@@ -66,6 +91,7 @@ export default function App() {
           onDisconnected={resetVoiceSession}
         >
           <RoomAudioRenderer />
+          <QuoteExperience />
         </LiveKitRoom>
       )}
     </>

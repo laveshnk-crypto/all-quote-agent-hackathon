@@ -145,7 +145,6 @@ class MyChoiceScraper(BaseScraper):
 
                 await page.wait_for_timeout(4500)
                 text = await page.inner_text("body")
-                screenshot_path = await self.capture(page)
 
                 # Results block renders as label/value pairs: "Fair benchmark" then
                 # "$2,258". Keying off those exact labels avoids matching the
@@ -153,6 +152,8 @@ class MyChoiceScraper(BaseScraper):
                 estimate = self._labelled_amount(text, r"Fair benchmark")
                 city_average = self._labelled_amount(text, r".*avg")
                 pays_now = self._labelled_amount(text, r"You pay now")
+
+                screenshot_path = await self.capture(page, amount=estimate)
 
                 if estimate is None:
                     return self.build_result(

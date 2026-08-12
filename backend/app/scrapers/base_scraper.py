@@ -72,8 +72,38 @@ class BaseScraper(ABC):
             finally:
                 await browser.close()
 
-    async def capture(self, page, *, suffix: str = "") -> Optional[str]:
-        """Screenshot the current page. Never raises -- proof is best-effort."""
+    async def focus_on_amount(self, page, amount: Optional[float]) -> bool:
+        """Scroll the reported figure into view so the screenshot actually shows it.
+
+        A screenshot of a page's hero banner proves nothing about the number we
+        extracted from halfway down it.
+        """
+        if amount is None:
+            return False
+
+        # Try the ways sites render the same figure: "$2,348", "$2,348.00", "2,348".
+        candidates = [
+            f"${amount:,.0f}",
+            f"${amount:,.2f}",
+            f"{amount:,.0f}",
+        ]
+        for needle in candidates:
+            try:
+                locator = page.get_by_text(needle, exact=False).first
+                await locator.scroll_into_view_if_needed(timeout=3500)
+                await page.wait_for_timeout(400)
+                return True
+            except Exception:
+                continue
+        return False
+
+    async def capture(self, page, *, suffix: str = "", amount: Optional[float] = None) -> Optional[str]:
+        """Screenshot the current page. Never raises -- proof is best-effort.
+
+        Pass ``amount`` to scroll the reported figure into frame first.
+        """
+        if amount is not None:
+            await self.focus_on_amount(page, amount)
         try:
             shot = await page.screenshot(full_page=False)
         except Exception:

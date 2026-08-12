@@ -192,14 +192,14 @@ class FSRABenchmarkScraper(BaseScraper):
                 await page.locator("button:has-text('Calculate')").click()
                 await page.wait_for_timeout(2500)
 
-                screenshot_path = await self.capture(page)
-
                 table_cells = await page.locator("table tbody tr td").all_text_contents()
                 result_payload = self._extract_result_payload(table_cells)
 
                 mandatory = result_payload["mandatory_coverage"]["premiums"]
                 full = result_payload["full_coverage"]["premiums"]
                 annual_premium = full["average"]
+
+                screenshot_path = await self.capture(page, amount=annual_premium)
 
                 if annual_premium is None:
                     return self.build_result(
