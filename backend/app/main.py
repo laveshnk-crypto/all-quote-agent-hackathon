@@ -1,48 +1,34 @@
-from typing import Dict, Any
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Explicitly load backend/.env relative to main.py
+ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from app.database import engine, Base
-import app.models  # Ensures models are imported so Base knows about them
-from app.scrapers.fsra_benchmark import FSRABenchmarkScraper
+from app.routers import token
 
 app = FastAPI(title="Ontario Auto Insurance Agent API")
 
-
-class FSRARequest(BaseModel):
-    age: int
-    gender: str
-    marital_status: str
-    postal_code: str
-    annual_mileage: int
-    vehicle_model_year: int
-    vehicle_make: str
-    years_licensed: int
-    years_claim_free: int
-    multi_vehicle_discount: str = "Not Applied"
-    multi_policy_discount: str = "Not Applied"
-
+# Setup CORS to allow your frontend on port 5174
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Adjust this to your frontend's origin
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://10.0.0.234:5173",
+        "http://10.0.0.234:5174",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        # Auto-create missing tables in PostgreSQL
-        await conn.run_sync(Base.metadata.create_all)
+app.include_router(token.router)
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "system": "Ontario Auto Insurance Agent API"}
-
-
-@app.post("/fsra/quote")
-async def create_fsra_quote(payload: FSRARequest) -> Dict[str, Any]:
-    scraper = FSRABenchmarkScraper()
-    result = await scraper.execute(payload.dict())
-    return result
+    return {"status": "online"}

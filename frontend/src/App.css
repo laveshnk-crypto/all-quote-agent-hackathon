@@ -17,6 +17,66 @@
   }
 }
 
+.App {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.logo-circle {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.logo-circle:hover,
+.logo-circle:active {
+  background: rgba(120, 195, 255, 0.2);
+  border-color: rgba(120, 195, 255, 0.7);
+  box-shadow: 0 24px 42px rgba(17, 77, 126, 0.35);
+}
+
+.logo-circle.active {
+  background: linear-gradient(135deg, rgba(255, 96, 96, 0.28), rgba(255, 165, 79, 0.32));
+  border-color: rgba(255, 120, 120, 0.95);
+  box-shadow: 0 0 0 10px rgba(255, 106, 106, 0.12), 0 18px 42px rgba(214, 73, 73, 0.45);
+  animation: speakingPulse 1.25s ease-in-out infinite;
+}
+
+.logo-circle:focus-visible {
+  outline: 2px solid rgba(120, 195, 255, 0.9);
+  outline-offset: 6px;
+}
+
+.bot-logo {
+  width: 100px;
+  height: 100px;
+}
+
+@keyframes speakingPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 10px rgba(255, 106, 106, 0.12), 0 18px 42px rgba(214, 73, 73, 0.45);
+    filter: saturate(1);
+  }
+  50% {
+    box-shadow: 0 0 0 16px rgba(255, 106, 106, 0.18), 0 24px 52px rgba(214, 73, 73, 0.62);
+    filter: saturate(1.2);
+  }
+}
+
 #center {
   display: flex;
   flex-direction: column;
@@ -141,39 +201,5 @@
   &::after {
     right: 0;
     border-right-color: var(--border);
-  }
-}
-
-.base {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -1;
-  background-color: #0b0f19; /* Dark background color */
-
-  /* Layered translucent squares generated with radial gradients */
-  background-image: 
-    radial-gradient(2px 2px at 20px 30px, rgba(255, 255, 255, 0.4), rgba(0, 0, 0, 0)),
-    radial-gradient(3px 3px at 40px 70px, rgba(255, 255, 255, 0.25), rgba(0, 0, 0, 0)),
-    radial-gradient(2px 2px at 90px 40px, rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0)),
-    radial-gradient(4px 4px at 160px 120px, rgba(255, 255, 255, 0.3), rgba(0, 0, 0, 0)),
-    radial-gradient(2px 2px at 230px 190px, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0)),
-    radial-gradient(3px 3px at 300px 80px, rgba(255, 255, 255, 0.45), rgba(0, 0, 0, 0));
-
-  /* Tile size for the repeat pattern */
-  background-size: 350px 350px;
-  
-  /* Infinite downward animation */
-  animation: moveSquares 20s linear infinite;
-}
-
-@keyframes moveSquares {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 0 350px; /* Moves exactly one tile height down */
   }
 }

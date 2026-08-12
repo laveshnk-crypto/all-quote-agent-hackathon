@@ -49,10 +49,25 @@ logs/
 
 # Scraper / debug artifacts
 screenshots/
+**/screenshots/
+app/scrapers/screenshots/
+backend/app/scrapers/screenshots/
 *_debug.html
 *_debug.txt
 page_debug.html
 selects_debug.txt
+*.png
+*.json
+playwright-report/
+test-results/
+
+# Local runtime / tool outputs
+.python-version
+.venv/
+.venv*/
+.env.local
+.env.development.local
+.env.production.local
 
 # OS / editor
 .DS_Store
