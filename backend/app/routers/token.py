@@ -1,5 +1,6 @@
 import os
 import traceback
+import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -24,14 +25,21 @@ def build_livekit_token():
             detail="LiveKit environment variables missing in backend .env file",
         )
 
+    # A fresh room per session. Agent dispatch declared in RoomConfiguration only
+    # fires when the room is created, so reusing one fixed room name means the
+    # agent is dispatched to the first caller and nobody after that -- the room
+    # already exists, so joining it never triggers a new dispatch.
+    room_name = f"quote-{uuid.uuid4().hex[:12]}"
+    identity = f"user-{uuid.uuid4().hex[:8]}"
+
     token = (
         AccessToken(api_key, api_secret)
-        .with_identity("user-client")
+        .with_identity(identity)
         .with_name("Web User")
         .with_grants(
             VideoGrants(
                 room_join=True,
-                room="agent-room",
+                room=room_name,
             )
         )
         .with_room_config(
@@ -44,6 +52,7 @@ def build_livekit_token():
     return {
         "accessToken": token.to_jwt(),
         "url": livekit_url,
+        "room": room_name,
     }
 
 

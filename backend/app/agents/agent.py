@@ -502,6 +502,7 @@ async def entrypoint(ctx: JobContext):
 
     agent = DefaultAgent(ctx)
 
+    logger.info("entrypoint: starting session for room %s", ctx.room.name)
     await session.start(
         agent=agent,
         room=ctx.room,
@@ -513,10 +514,12 @@ async def entrypoint(ctx: JobContext):
             ),
         ),
     )
+    logger.info("entrypoint: session started, room connected=%s", ctx.room.isconnected())
 
     # Must come after start(): session.start() is what connects the room, and
     # ctx.room.local_participant raises until then.
     agent.register_rpc()
+    logger.info("entrypoint: rpc registered, agent ready")
 
 
 if __name__ == "__main__":
