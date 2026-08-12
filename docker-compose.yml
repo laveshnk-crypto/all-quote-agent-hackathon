@@ -1,0 +1,71 @@
+# Brings up the whole system with one command:
+#
+#   docker compose up --build
+#
+# Then open http://localhost:5173.
+#
+# Three processes have to be running for a call to work: the API that mints the
+# LiveKit token, the agent worker that joins the room, and the web UI. Running
+# them by hand is what let stale `agent.py dev` workers pile up -- several
+# workers registering under one agent_name compete for job dispatches, and a job
+# landing on an old one looks like the agent silently ignoring you. Compose
+# guarantees exactly one agent process, and `down` actually stops it.
+
+services:
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8001:8001"
+    volumes:
+      # Screenshot proof: the agent writes here, the API serves it at /artifacts.
+      # Both services must see the same directory or the UI shows broken images.
+      - artifacts:/app/app/scrapers/screenshots
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8001
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8001/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - artifacts:/app/app/scrapers/screenshots
+    # `start` rather than `dev`: dev mode is for local iteration and is noisier.
+    command: >
+      python app/agents/agent.py start
+    depends_on:
+      api:
+        condition: service_healthy
+    # Exactly one. Scaling this up re-creates the stale-worker bug: every replica
+    # registers under the same agent_name and jobs land on whichever LiveKit picks.
+    deploy:
+      replicas: 1
+    # Chromium needs more than Docker's default 64MB of shared memory or it
+    # crashes part-way through a run with no useful error.
+    shm_size: 1gb
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # The browser resolves this, not the container, so it stays localhost.
+        VITE_API_BASE: http://localhost:8001
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  artifacts:

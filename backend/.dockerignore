@@ -1,0 +1,16 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.DS_Store
+
+# Regenerated on every run, and large.
+app/scrapers/screenshots/
+page_debug.html
+selects_debug.txt
+
+# Secrets are injected via env_file at run time, not baked into the image.
+.env
+.env.local

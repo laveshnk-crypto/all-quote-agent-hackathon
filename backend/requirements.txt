@@ -1,3 +1,6 @@
+# Pinned to the versions this project was built and verified against. livekit-agents
+# in particular moves fast enough that an unpinned rebuild can change the session
+# API out from under the agent.
 fastapi==0.111.0
 uvicorn[standard]==0.30.1
 sqlalchemy[asyncio]==2.0.31
@@ -8,5 +11,6 @@ playwright==1.45.0
 pandas==2.2.2
 httpx==0.27.0
 python-dotenv==1.0.1
-livekit-agents[openai,deepgram,cartesia]
-livekit-plugins-ai-coustics
+
+livekit-agents[openai,deepgram,cartesia]==1.6.9
+livekit-plugins-ai-coustics==0.3.0

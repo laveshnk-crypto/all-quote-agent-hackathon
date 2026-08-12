@@ -6,6 +6,8 @@ import './App.css';
 import lucideBot from './assets/lucide--bot.svg';
 import QuoteExperience from './components/QuoteExperience.jsx';
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8001';
+
 // Split so the two halves can carry different colour, and every letter gets its
 // own index for the staggered entrance and the shimmer that follows it.
 const BRAND = [
@@ -33,7 +35,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('http://localhost:8001/api/token');
+      const res = await fetch(`${API_BASE}/api/token`);
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }

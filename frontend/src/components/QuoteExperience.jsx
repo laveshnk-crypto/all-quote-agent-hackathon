@@ -8,7 +8,8 @@ import './QuoteExperience.css';
 const QUOTE_UI_TOPIC = 'quote.ui';
 const QUOTE_SUBMIT_RPC = 'quote.submit';
 // Screenshots are served by the FastAPI backend, not the Vite dev server.
-const API_BASE = 'http://localhost:8001';
+// Baked in at build time by Vite; docker-compose passes it as a build arg.
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8001';
 
 function QuoteForm({ fields, values, onChange, onSubmit, busy }) {
   return (

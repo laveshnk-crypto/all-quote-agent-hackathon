@@ -33,6 +33,47 @@ The current implementation focuses on the FSRA benchmark workflow, including inp
 
 ---
 
+## Run everything with Docker
+
+Three processes have to be alive for a call to work: the API that mints the LiveKit
+token, the agent worker that joins the room, and the web UI. Compose starts all three
+together.
+
+```bash
+cp backend/.env.example backend/.env   # fill in your LiveKit keys
+docker compose up --build
+```
+
+Then open <http://localhost:5173>.
+
+| Service | Port | What it is |
+| --- | --- | --- |
+| `web` | 5173 | React UI, built and served by nginx |
+| `api` | 8001 | Token endpoint and `/artifacts` screenshot proof |
+| `agent` | – | LiveKit worker; joins rooms and runs the ten scrapers |
+
+Useful commands:
+
+```bash
+docker compose logs -f agent     # watch the worker pick up jobs
+docker compose down              # stop everything
+docker compose up -d --build web # rebuild just the UI
+```
+
+Two things the compose file deliberately pins:
+
+- **The agent runs exactly one replica.** Every worker registers under the same
+  `agent_name` and they compete for job dispatches, so a second copy means calls
+  land on whichever one LiveKit picks. That is the failure mode where you talk and
+  nothing answers. Running under compose also means `down` actually stops the
+  worker, instead of leaving strays behind that outlive your terminal.
+- **`api` and `agent` share the `artifacts` volume.** The scrapers write screenshots,
+  the API serves them at `/artifacts`, and the UI links to them as proof for each
+  quote. Split those directories and every proof image 404s.
+
+`shm_size: 1gb` is set on the agent because Chromium crashes mid-run on Docker's
+default 64MB of shared memory.
+
 ## Run the FSRA benchmark locally
 
 1. Create and activate a Python environment.

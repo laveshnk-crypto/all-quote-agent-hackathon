@@ -32,8 +32,7 @@ export default function VoiceAssistant() {
     }
 
     try {
-      // Fetch token from your FastAPI backend port (e.g. 8001)
-      const res = await fetch('http://localhost:8001/api/token');
+      const res = await fetch(`${import.meta.env.VITE_API_BASE ?? 'http://localhost:8001'}/api/token`);
       const data = await res.json();
 
       setToken(data.accessToken);
