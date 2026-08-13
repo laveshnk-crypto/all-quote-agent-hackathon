@@ -36,14 +36,45 @@ class RatesCaScraper(RatePageScraper):
     ) -> Dict[str, Any]:
         annual = None
         headline = None
+        matched_on = "city average"
 
-        # "The average cost of car insurance in Toronto-proper is $2,888 per year"
-        for line in lines_with_money(text, keywords=r"average cost|average annual|average premium"):
-            match = re.search(r"\$\s*(\d[\d,]{2,})\s*(?:per year|annually|a year)?", line, re.I)
-            if match:
-                annual = float(match.group(1).replace(",", ""))
-                headline = line[:200]
-                break
+        # Best available: this page lists an annual premium per forward sortation
+        # area, so quote the applicant's own postal area rather than the whole
+        # city. Across Toronto these run $2,510-$4,026 against a $2,888 city
+        # average, so the difference is worth having.
+        fsa = str(applicant_data.get("postal_code") or "").upper().replace(" ", "")[:3]
+        if re.fullmatch(r"[A-Z]\d[A-Z]", fsa):
+            by_fsa = {
+                area: float(amount.replace(",", ""))
+                for area, amount in re.findall(
+                    r"\b([A-Z]\d[A-Z])\b[^\n]{0,60}?\$\s*([\d,]{3,})", text
+                )
+            }
+            found = by_fsa.get(fsa)
+            if plausible_annual(found):
+                annual = found
+                matched_on = f"postal area {fsa}"
+                ranked = sorted(by_fsa.values())
+                position = ranked.index(found) + 1
+                headline = (
+                    f"Rates.ca puts {fsa} at ${found:,.0f}/yr -- {position} of "
+                    f"{len(ranked)} postal areas they list for this city, which "
+                    f"span ${ranked[0]:,.0f} to ${ranked[-1]:,.0f}."
+                )
+
+        # Otherwise the city-wide figure: "The average cost of car insurance in
+        # Toronto-proper is $2,888 per year".
+        if annual is None:
+            for line in lines_with_money(
+                text, keywords=r"average cost|average annual|average premium"
+            ):
+                match = re.search(
+                    r"\$\s*(\d[\d,]{2,})\s*(?:per year|annually|a year)?", line, re.I
+                )
+                if match:
+                    annual = float(match.group(1).replace(",", ""))
+                    headline = line[:200]
+                    break
 
         # Rates.ca ranks neighbouring cities: "1 Burlington $2,109 26.97% lower".
         comparisons: List[Dict[str, Any]] = []
@@ -70,5 +101,5 @@ class RatesCaScraper(RatePageScraper):
             "annual_premium": annual,
             "headline": headline,
             "comparisons": comparisons,
-            "matched_on": "city average" if annual else None,
+            "matched_on": matched_on if annual else None,
         }

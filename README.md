@@ -85,9 +85,11 @@ else's profile.
 **Rates.ca's live funnel is not reachable.** Entering a postal code on rates.ca and
 pressing "Get My Quote" hands off to `quotes.rates.ca/autoquote`, which answers HTTP 403
 behind a Cloudflare "Verify you are human" challenge that does not clear on its own. This
-project does not defeat bot protection, so that channel reads their public city rate page
-instead — which carries the figure we want anyway. Tested and documented in
-[`rates_ca.py`](backend/app/scrapers/rates_ca.py) so it is not re-attempted.
+project does not defeat bot protection, so that channel reads their public rate page
+instead — which turns out to carry something better: an annual premium **per postal
+area**. The applicant's own FSA is quoted rather than the city average (M5V $2,702 vs
+Toronto's $2,888; across Toronto they span $2,510–$4,026). Tested and documented in
+[`rates_ca.py`](backend/app/scrapers/rates_ca.py) so the funnel is not re-attempted.
 
 **How much each one actually takes.** Two sites run a real quote form: FSRA's calculator,
 and LowestRates' funnel, which takes twelve fields including overnight parking, anti-theft,
