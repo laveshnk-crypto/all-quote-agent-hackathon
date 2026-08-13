@@ -1,133 +1,197 @@
-# OmniQuote ON
+# OmniQuote
 
-OmniQuote ON is a backend-first Ontario auto insurance quote automation project. It uses Playwright to drive the FSRA Regulator Rate Ranger benchmark flow and capture the resulting coverage information for a supplied applicant profile.
+A voice agent that interviews an Ontario driver, puts their answers on screen to
+confirm, then prices them against **ten public rate sources at once** — entering their
+details into each site's own form and screenshotting the page every figure came from.
 
-The current implementation focuses on the FSRA benchmark workflow, including input mapping, browser automation, evidence capture, and result export.
-
----
-
-## What the project does
-
-- Accepts a structured applicant profile with fields such as age, gender, marital status, postal code, annual mileage, vehicle make/model year, and discount flags.
-- Maps those values into the FSRA form fields.
-- Runs the Playwright automation flow against the FSRA benchmark site.
-- Saves a screenshot and a JSON result file in the scraper artifacts folder.
-- Returns the parsed results from the page in a structured payload.
+Ask it for a quote out loud. About thirty seconds later you have ten numbers, the
+cheapest highlighted, and a screenshot proving each one.
 
 ---
 
-## Current structure
+## How a call goes
 
-- backend/app/main.py: FastAPI entrypoint and FSRA quote endpoint.
-- backend/app/scrapers/fsra_benchmark.py: Playwright scraper for the FSRA benchmark flow.
-- backend/app/scrapers/base_scraper.py: shared scraper helpers for screenshots and JSON artifacts.
-- backend/test_fsra.py: simple local test harness for running the FSRA scraper.
-- backend/app/scrapers/screenshots: output folder for screenshots and JSON result files.
-
----
-
-## Tech stack
-
-- Backend: FastAPI, Pydantic, Playwright, Python
-- Database: SQLAlchemy + PostgreSQL support is scaffolded, but the current flow is centered on the scraper and evidence export.
+1. **The agent asks.** Two or three questions at a time — date of birth and gender, then
+   postal code and city, then the car, and so on. Twenty-four fields, about ten questions.
+2. **The details go on screen.** An editable form appears and the microphone closes; the
+   form *is* the confirmation. Correct anything, hit confirm. A "tap to talk" button is
+   there if you'd rather say something.
+3. **Ten sources run at once.** Each one gets your details typed into its own quote form,
+   and cards fill in as they land. The agent stays silent through this.
+4. **The agent talks you through it.** Best rate first, how closely it actually matches
+   you, and the spread across all ten. Swipe the cards, or open the table to compare them
+   side by side with the cheapest in gold and a screenshot behind every row.
 
 ---
 
-## Run everything with Docker
-
-Three processes have to be alive for a call to work: the API that mints the LiveKit
-token, the agent worker that joins the room, and the web UI. Compose starts all three
-together.
+## Quick start
 
 ```bash
-cp backend/.env.example backend/.env   # fill in your LiveKit keys
+cp backend/.env.example backend/.env   # add your LiveKit keys
 docker compose up --build
 ```
 
-Then open <http://localhost:5173>.
+Open <http://localhost:5173> and press the bot.
 
 | Service | Port | What it is |
 | --- | --- | --- |
 | `web` | 5173 | React UI, built and served by nginx |
-| `api` | 8001 | Token endpoint and `/artifacts` screenshot proof |
-| `agent` | – | LiveKit worker; joins rooms and runs the ten scrapers |
-
-Useful commands:
+| `api` | 8001 | LiveKit token endpoint, and `/artifacts` for screenshot proof |
+| `agent` | – | LiveKit worker: joins the room, runs the ten scrapers |
 
 ```bash
-docker compose logs -f agent     # watch the worker pick up jobs
-docker compose down              # stop everything
-docker compose up -d --build web # rebuild just the UI
+docker compose logs -f agent      # watch it pick up a call
+docker compose down               # stop everything
 ```
 
-Two things the compose file deliberately pins:
+### Running it without Docker
 
-- **The agent runs exactly one replica.** Every worker registers under the same
-  `agent_name` and they compete for job dispatches, so a second copy means calls
-  land on whichever one LiveKit picks. That is the failure mode where you talk and
-  nothing answers. Running under compose also means `down` actually stops the
-  worker, instead of leaving strays behind that outlive your terminal.
-- **`api` and `agent` share the `artifacts` volume.** The scrapers write screenshots,
-  the API serves them at `/artifacts`, and the UI links to them as proof for each
-  quote. Split those directories and every proof image 404s.
-
-`shm_size: 1gb` is set on the agent because Chromium crashes mid-run on Docker's
-default 64MB of shared memory.
-
-## Run the FSRA benchmark locally
-
-1. Create and activate a Python environment.
-2. Install backend dependencies:
+Three processes, three terminals. All of them have to be up for a call to work.
 
 ```bash
-cd backend
-pip install -r requirements.txt
+# 1. API
+cd backend && uvicorn app.main:app --port 8001
+
+# 2. Agent worker
+cd backend && python app/agents/agent.py dev
+
+# 3. UI
+cd frontend && npm run dev
 ```
 
-3. Run the test harness:
-
-```bash
-python test_fsra.py
-```
-
-4. Or run the FastAPI app and call the endpoint:
-
-```bash
-cd backend
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Then send a POST request to:
-
-```text
-http://localhost:8000/fsra/quote
-```
-
-with a JSON body shaped like:
-
-```json
-{
-  "age": 24,
-  "gender": "Female",
-  "marital_status": "Not Married",
-  "postal_code": "L6X 4Y3",
-  "annual_mileage": 10100,
-  "vehicle_model_year": 2021,
-  "vehicle_make": "HYUNDAI",
-  "years_licensed": 2,
-  "years_claim_free": 2,
-  "multi_vehicle_discount": "Not Applied",
-  "multi_policy_discount": "Not Applied"
-}
-```
+> **Restart the worker after any backend edit.** LiveKit removed in-process
+> auto-reload from the Python CLI, so `dev` does *not* pick up your changes — you will
+> be testing old code without knowing it. And kill strays before starting:
+> `pkill -9 -f "agent.py dev"`. Several workers registering under the same
+> `agent_name` compete for job dispatches, so a call can land on a stale one and
+> nothing answers. This is the single most common way to lose an hour on this project.
 
 ---
 
-## Output artifacts
+## The ten sources
 
-Each run saves:
+| Source | Type | Needs |
+| --- | --- | --- |
+| FSRA Regulator Rate Ranger | Regulatory | age, gender, marital status, postal code, mileage, vehicle year + make, years licensed, years claim-free |
+| LowestRates.ca | Aggregator | city, age |
+| Rates.ca | Aggregator | city |
+| Ratehub.ca | Aggregator | city |
+| InsuranceHotline.com | Broker | – |
+| MyChoice.ca Calculator | Aggregator | age, vehicle year + make, postal code, current premium |
+| MyChoice.ca Rate Index | Aggregator | – |
+| HelloSafe.ca | Aggregator | – |
+| Surex.com | Broker | age |
+| isure.ca | Broker | – |
 
-- a screenshot PNG in backend/app/scrapers/screenshots
-- a JSON results file in backend/app/scrapers/screenshots
+A source that lacks what it needs returns `REJECTED` with a reason. It never substitutes
+a placeholder — a missing answer must not become a confident-looking quote for somebody
+else's profile.
 
-These files are returned in the scraper response as part of the evidence payload.
+**How much each one actually takes.** Two sites run a real quote form: FSRA's calculator,
+and LowestRates' funnel, which takes twelve fields including overnight parking, anti-theft,
+ownership and commute distance. MyChoice's calculator takes a full profile too. The rest
+publish rate data and only expose a postal-code box, so that is what gets entered —
+everything past it on those sites collects a name, email and phone, and **the automation
+deliberately stops before any step that would generate a real broker lead.**
+
+---
+
+## What's in the box
+
+```
+backend/app/
+  agents/agent.py          the voice agent: prompt, 24-field intake, the one quote tool
+  scrapers/
+    registry.py            the ten channels, concurrent fan-out, result ordering
+    profile.py             canonical answer format + per-site translation
+    browser.py             one shared Chromium, contexts per channel
+    base_scraper.py        result envelope, screenshot capture, value mapping
+    rate_page.py           shared shape for the published-rate sources
+    <ten channel modules>
+  routers/token.py         LiveKit token, fresh room per session
+  main.py                  FastAPI: token + /artifacts
+
+frontend/src/components/
+  QuoteExperience.jsx      phase machine: form -> loading -> results
+  QuoteCarousel.jsx        swipeable cards, gold winner
+  QuoteTable.jsx           side-by-side comparison, screenshot lightbox
+```
+
+### One answer, ten dialects
+
+Every site words the same question differently. Overnight parking is `Garage` on the
+form, `Private Garage` on LowestRates; marital status is `Not Married` on FSRA and
+`Single` elsewhere. So the form is normalised **once** into canonical tokens
+([`profile.py`](backend/app/scrapers/profile.py)), and each scraper declares a `VALUE_MAP`
+from those tokens to its own site's wording:
+
+```python
+VALUE_MAP = {
+    "parking": {"garage": "Private Garage", "driveway": "Private Driveway", ...},
+    "ownership": {"owned": "Owned - Paid in Cash / Completed Financing", ...},
+}
+```
+
+Binary answers are booleans; multi-valued ones are tokens, so a site offering a sixth
+parking option is a new row in a table rather than a schema change. Adding a source means
+a `parse` method and a value map — not another dialect of if-statements.
+
+### Screenshot proof
+
+Every channel screenshots the page it read, **scrolled to the figure it is reporting** —
+a screenshot of a site's hero banner proves nothing about a number halfway down it.
+Channels that fill a form screenshot that too, so you can see your own answers sitting in
+the site's fields. Failures are screenshotted as well. The API serves them from
+`/artifacts` and every table row links to its own.
+
+---
+
+## Testing
+
+```bash
+cd backend
+
+# Every scraper on its own, against the live sites — timing, entered fields,
+# screenshot check. Name channels to run a subset.
+python -m tests.test_scrapers_live
+python -m tests.test_scrapers_live lowestrates fsra_regulatory_benchmark
+
+# Parsing unit tests (no network)
+python -m unittest discover tests
+```
+
+`test_scrapers_live` is the one that earns its keep. It runs each channel in isolation so
+a slow or broken source is *named* instead of hiding inside an aggregate — and it has
+caught real bugs that a full-run test missed, including a source reporting a monthly
+figure as an annual premium, which would have won it the "cheapest" badge by a factor of
+ten.
+
+A full concurrent run is around **20–25 seconds** for all ten, with the first card on
+screen in about 7.
+
+---
+
+## Things worth knowing
+
+**Published data drifts.** Seven of the ten channels parse figures out of page copy that
+the sites rewrite on their own schedule. Parsers will break. The screenshots are what make
+that detectable — if a number starts looking wrong, the framed proof shows it immediately.
+Annual figures are sanity-checked against a $700–15,000 band so a monthly rate cannot
+masquerade as an annual one, but that is a floor, not a guarantee.
+
+**These are benchmarks, not binding quotes.** Regulatory averages and published rate data.
+A real policy needs a real application.
+
+**Terms of service.** Scraping these pages is against several sites' terms even though
+`robots.txt` doesn't disallow the paths. Fine for a hackathon demo; worth a proper look
+before anything public.
+
+**Requirements are pinned**, `livekit-agents` in particular — it moves fast enough that an
+unpinned rebuild can change the session API out from under the agent.
+
+---
+
+## Tech
+
+Python 3.11 · LiveKit Agents 1.6.9 (Deepgram STT, Gemini 3 Flash, Cartesia TTS) ·
+Playwright · FastAPI · React 19 · Vite · Docker Compose
