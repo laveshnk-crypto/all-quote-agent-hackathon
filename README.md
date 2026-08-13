@@ -39,11 +39,6 @@ Open <http://localhost:5173> and press the bot.
 | `api` | 8001 | LiveKit token endpoint, and `/artifacts` for screenshot proof |
 | `agent` | – | LiveKit worker: joins the room, runs the ten scrapers |
 
-```bash
-docker compose logs -f agent      # watch it pick up a call
-docker compose down               # stop everything
-```
-
 ### Running it without Docker
 
 Three processes, three terminals. All of them have to be up for a call to work.
