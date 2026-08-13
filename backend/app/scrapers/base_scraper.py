@@ -106,7 +106,12 @@ class BaseScraper(ABC):
         from playwright.async_api import async_playwright
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=headless)
+            browser = await p.chromium.launch(
+                headless=headless,
+                # Same flags as the shared pool: containers cap /dev/shm well
+                # below what Chromium wants, and there is no user namespace.
+                args=["--disable-dev-shm-usage", "--no-sandbox"],
+            )
             try:
                 context = await browser.new_context(
                     user_agent=USER_AGENT,

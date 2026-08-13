@@ -18,16 +18,18 @@ app = FastAPI(title="Ontario Auto Insurance Agent API")
 ARTIFACT_DIR = Path(__file__).resolve().parent / "scrapers" / "screenshots"
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Setup CORS to allow your frontend on port 5174
+# ALLOWED_ORIGINS is a comma-separated list of frontend origins (scheme + host,
+# no trailing slash). Unset means local development against the Vite dev server.
+_default_origins = "http://localhost:5173,http://localhost:5174"
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://10.0.0.234:5173",
-        "http://10.0.0.234:5174",
-        "*"
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

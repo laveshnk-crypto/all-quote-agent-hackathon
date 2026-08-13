@@ -1,0 +1,41 @@
+# Render blueprint: the whole backend (API + agent worker) as one Docker web
+# service. See backend/start.sh for why the two processes share a container in
+# production: Render disks can't be mounted into two services, and the agent
+# writes screenshots the API serves.
+#
+# To deploy: Render dashboard -> New -> Blueprint -> pick this repo. The three
+# LiveKit secrets are marked sync: false, so Render prompts for them at create
+# time instead of reading them from the repo.
+services:
+  - type: web
+    name: omniquote
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerCommand: bash start.sh
+    # Standard (2GB) is the floor: ten Chromium scrapers plus the voice agent
+    # OOM on anything smaller. Bump the plan before adding sources.
+    plan: standard
+    region: ohio
+    healthCheckPath: /
+    disk:
+      name: artifacts
+      mountPath: /app/app/scrapers/screenshots
+      sizeGB: 1
+    envVars:
+      # From LiveKit Cloud: Settings -> Keys. Entered in the Render dashboard,
+      # never committed.
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      # Must match the agent_name the worker registers under (see
+      # backend/.env.example for why a mismatch fails silently).
+      - key: LIVEKIT_AGENT_NAME
+        value: assistant-1-ge-1
+      # Comma-separated frontend origins allowed by CORS. Update in the Render
+      # dashboard if the deployed frontend lands on a different domain.
+      - key: ALLOWED_ORIGINS
+        value: https://omniquote.vercel.app
