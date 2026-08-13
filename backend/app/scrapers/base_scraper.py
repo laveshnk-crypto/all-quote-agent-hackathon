@@ -27,6 +27,11 @@ class BaseScraper(ABC):
     # quietly substituting a placeholder, which would produce a fake quote.
     required_fields: List[str] = []
 
+    # This site's dialect: canonical token -> the exact string this site's form
+    # uses. Declared per scraper so one applicant answer reaches every site in
+    # that site's own words. See app/scrapers/profile.py.
+    VALUE_MAP: Dict[str, Dict[Any, str]] = {}
+
     def __init__(self, screenshot_dir: str = "app/scrapers/screenshots", pool=None):
         self.screenshot_dir = screenshot_dir
         os.makedirs(self.screenshot_dir, exist_ok=True)
@@ -101,6 +106,14 @@ class BaseScraper(ABC):
             self.entry_shots.append(path)
         return path
 
+    def site_value(self, field: str, token: Any, default: Optional[str] = None) -> Optional[str]:
+        """Translate a canonical token into this site's wording.
+
+        Returns ``None`` when this site has no equivalent, which is a real
+        answer -- the field is left alone rather than guessed at.
+        """
+        return self.VALUE_MAP.get(field, {}).get(token, default)
+
     @staticmethod
     async def set_select(page, selector: str, value: str, *, by: str = "label") -> bool:
         """Best-effort <select> set. Returns whether it took."""
@@ -155,9 +168,14 @@ class BaseScraper(ABC):
         ]
         for needle in candidates:
             try:
-                locator = page.get_by_text(needle, exact=False).first
-                await locator.scroll_into_view_if_needed(timeout=3500)
-                await page.wait_for_timeout(400)
+                locator = page.get_by_text(needle, exact=False)
+                # count() resolves immediately. Going straight to scroll meant
+                # three misses cost 10s of dead waiting per channel, which was a
+                # large part of why channels ran out of time.
+                if await locator.count() == 0:
+                    continue
+                await locator.first.scroll_into_view_if_needed(timeout=1500)
+                await page.wait_for_timeout(300)
                 return True
             except Exception:
                 continue

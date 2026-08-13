@@ -15,6 +15,14 @@ class FSRABenchmarkScraper(BaseScraper):
         "vehicle_model_year", "vehicle_make", "years_licensed", "years_claim_free",
     ]
 
+    #: FSRA's wording. Note "Not Married" rather than "Single" -- the regulator's
+    #: form uses the former, and picking the wrong one silently matches nobody.
+    VALUE_MAP = {
+        "gender": {"male": "Male", "female": "Female"},
+        "married": {True: "Married", False: "Not Married"},
+        "discount": {True: "Applied", False: "Not Applied"},
+    }
+
     @staticmethod
     def _parse_band(values: List[str]) -> Dict[str, Any]:
         """FSRA reports three annual premiums per coverage tier: low, average, high."""
@@ -156,10 +164,7 @@ class FSRABenchmarkScraper(BaseScraper):
         # Discount toggles are genuinely optional on the FSRA form; absent means
         # "not applied", which is the site's own default, not an invented answer.
         def discount_display(key: str) -> str:
-            value = applicant_data.get(key, False)
-            if isinstance(value, bool):
-                return "Applied" if value else "Not Applied"
-            return str(value)
+            return self.site_value("discount", bool(applicant_data.get(key, False)), "Not Applied")
 
         multi_vehicle_discount_display = discount_display("multi_vehicle_discount")
         multi_policy_discount_display = discount_display("multi_policy_discount")

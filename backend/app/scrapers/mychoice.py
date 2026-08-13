@@ -35,6 +35,12 @@ class MyChoiceScraper(BaseScraper):
 
     url = "https://www.mychoice.ca/ontario-car-insurance-calculator/"
 
+    #: MyChoice labels its history buttons by claim/ticket state.
+    VALUE_MAP = {
+        "claims": {True: "Claim-free", False: "1+ at-fault accident"},
+        "tickets": {True: "No tickets", False: "1+ ticket"},
+    }
+
     @staticmethod
     def _age_band_label(age: int) -> str:
         for ceiling, value in AGE_BANDS:
@@ -141,8 +147,8 @@ class MyChoiceScraper(BaseScraper):
                 await choose(3, band, "age_band")
 
                 for label in (
-                    "Claim-free" if claim_free else "1+ at-fault accident",
-                    "No tickets" if no_tickets else "1+ ticket",
+                    self.site_value("claims", claim_free),
+                    self.site_value("tickets", no_tickets),
                 ):
                     try:
                         await page.get_by_role("button", name=re.compile(label, re.I)).first.click(

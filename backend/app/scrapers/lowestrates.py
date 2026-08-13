@@ -22,17 +22,23 @@ class LowestRatesScraper(RatePageScraper):
 
     required_fields = ["city", "age"]
 
-    #: The site's own wording for where a car sleeps, in our order of preference.
-    PARKING_OPTIONS = {
-        "Garage": "Private Garage",
-        "Private Garage": "Private Garage",
-        "Driveway": "Private Driveway",
-        "Private Driveway": "Private Driveway",
-        "Underground": "Underground Parking",
-        "Underground Parking": "Underground Parking",
-        "Parking Lot": "Parking Lot",
-        "Street": "Parking Lot",
-        "Carport": "Carport",
+    #: LowestRates' own wording for each canonical answer.
+    VALUE_MAP = {
+        "parking": {
+            "garage": "Private Garage",
+            "driveway": "Private Driveway",
+            "underground": "Underground Parking",
+            "lot": "Parking Lot",
+            "street": "Street",
+            "carport": "Carport",
+        },
+        "use": {"personal": "Personal", "business": "Business"},
+        "ownership": {
+            "owned": "Owned - Paid in Cash / Completed Financing",
+            "financed": "Financed",
+            "leased": "Leased",
+        },
+        "yesno": {True: "Yes", False: "No"},
     }
 
     async def enter_profile(self, page, applicant_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -104,12 +110,12 @@ class LowestRatesScraper(RatePageScraper):
         if applicant_data.get("winter_tires") is not None:
             await choose(
                 "winter-tires[]",
-                "Yes" if applicant_data["winter_tires"] else "No",
+                self.site_value("yesno", bool(applicant_data["winter_tires"])),
                 "winter_tires",
             )
 
         if applicant_data.get("anti_theft_device") is not None:
-            answer = "Yes" if applicant_data["anti_theft_device"] else "No"
+            answer = self.site_value("yesno", bool(applicant_data["anti_theft_device"]))
             # Rendered conditionally with no stable name attribute, so locate it
             # by the question the site prints above it.
             try:
@@ -121,21 +127,21 @@ class LowestRatesScraper(RatePageScraper):
             except Exception as exc:
                 entered.setdefault("_skipped", []).append(f"anti_theft: {str(exc)[:50]}")
 
-        ownership = str(applicant_data.get("financed_or_leased") or "").strip()
         await choose(
             "is-leased[]",
-            {
-                "Financed": "Financed",
-                "Leased": "Leased",
-                "Owned": "Owned - Paid in Cash / Completed Financing",
-            }.get(ownership),
+            self.site_value("ownership", applicant_data.get("financed_or_leased")),
             "ownership",
         )
-
-        parking = str(applicant_data.get("overnight_parking") or "").strip()
-        await choose("overnight-parking[]", self.PARKING_OPTIONS.get(parking), "overnight_parking")
-
-        await choose("primary-use[]", str(applicant_data.get("primary_use") or ""), "primary_use")
+        await choose(
+            "overnight-parking[]",
+            self.site_value("parking", applicant_data.get("overnight_parking")),
+            "overnight_parking",
+        )
+        await choose(
+            "primary-use[]",
+            self.site_value("use", applicant_data.get("primary_use")),
+            "primary_use",
+        )
 
         # Distance dropdowns use fixed buckets, so snap to the nearest offered value.
         for field, source, key in (
@@ -158,7 +164,7 @@ class LowestRatesScraper(RatePageScraper):
         ):
             value = applicant_data.get(source)
             if value is not None:
-                await choose(field, "Yes" if value else "No", key)
+                await choose(field, self.site_value("yesno", bool(value)), key)
 
         await self.capture_entry(page, "2_vehicle")
 

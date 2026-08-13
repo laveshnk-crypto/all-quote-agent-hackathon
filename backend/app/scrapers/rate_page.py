@@ -97,10 +97,14 @@ class RatePageScraper(BaseScraper):
             try:
                 # `:visible` skips the duplicate inputs these sites hide in
                 # collapsed mobile headers, which is what fill() was hitting.
-                field = page.locator(f"{selector}:visible").first
-                await field.scroll_into_view_if_needed(timeout=2500)
-                await field.fill(postal, timeout=3500)
-                await page.wait_for_timeout(350)
+                field = page.locator(f"{selector}:visible")
+                # Cheap existence check first. A site with no postal box at all
+                # (HelloSafe, isure) used to burn 6s per selector here -- 30s of
+                # dead waiting on a page that was never going to have one.
+                if await field.count() == 0:
+                    continue
+                await field.first.fill(postal, timeout=2500)
+                await page.wait_for_timeout(250)
                 await self.capture_entry(page, "postal")
                 return {"entered": {"postal_code": postal}, "selector": selector}
             except Exception:
@@ -214,6 +218,37 @@ class RatePageScraper(BaseScraper):
                 evidence_payload={"error": str(exc), "attempts": attempts},
                 screenshot_path=screenshot_path,
             )
+
+
+# Ontario annual auto premiums live in this band. Anything below is a monthly
+# figure, a deductible or a discount; anything above is a coverage limit. These
+# pages print all of those next to each other, and picking the first dollar sign
+# after a city name once reported a $239 monthly rate as an annual premium --
+# which made that source look like the cheapest by a factor of ten.
+ANNUAL_MIN = 700.0
+ANNUAL_MAX = 15000.0
+
+
+def plausible_annual(value: Optional[float]) -> bool:
+    """Is this figure credible as an annual Ontario premium?"""
+    return value is not None and ANNUAL_MIN <= value <= ANNUAL_MAX
+
+
+def first_plausible_annual(pattern: str, text: str, flags: int = re.I) -> Optional[tuple]:
+    """First match whose captured amount is a credible annual premium.
+
+    Returns ``(amount, matched_text)`` or ``None``. Scanning past implausible
+    matches is what separates "the number near the city name" from "the city's
+    annual premium".
+    """
+    for match in re.finditer(pattern, text, flags):
+        try:
+            amount = float(match.group(1).replace(",", ""))
+        except (ValueError, IndexError):
+            continue
+        if plausible_annual(amount):
+            return amount, match.group(0)
+    return None
 
 
 def lines_with_money(text: str, *, keywords: str) -> List[str]:

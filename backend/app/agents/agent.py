@@ -30,6 +30,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.routers.token import build_livekit_token
+from app.scrapers.profile import build_profile, legacy_applicant_dict
 from app.scrapers.registry import channel_directory, run_all_channels, summarise
 
 logger = logging.getLogger("insurance-quote-agent")
@@ -619,34 +620,16 @@ class DefaultAgent(Agent):
         confirmed = outcome["confirmed"]
         dob = _parse_date_of_birth(confirmed["date_of_birth"])
 
-        applicant_data = {
-            "age": _age_on(dob),
-            "gender": confirmed["gender"],
-            "marital_status": confirmed["marital_status"],
-            "postal_code": confirmed["postal_code"],
-            "city": confirmed["city"],
-            "annual_mileage": confirmed["annual_mileage_km"],
-            "vehicle_model_year": confirmed["vehicle_year"],
-            "vehicle_year": confirmed["vehicle_year"],
-            # The known-good scraper run used an uppercase make against the site's react-select.
-            "vehicle_make": confirmed["vehicle_make"].strip().upper(),
-            "vehicle_model": confirmed.get("vehicle_model"),
-            "years_licensed": confirmed["years_licensed"],
-            "years_claim_free": confirmed["years_claim_free"],
-            "at_fault_accidents": confirmed["at_fault_accidents"],
-            "tickets_convictions": confirmed["tickets_convictions"],
-            "current_monthly_premium": confirmed.get("current_monthly_premium"),
-            "overnight_parking": confirmed["overnight_parking"],
-            "primary_use": confirmed["primary_use"],
-            "financed_or_leased": confirmed["financed_or_leased"],
-            "daily_commute_km": confirmed.get("daily_commute_km"),
-            "anti_theft_device": confirmed["anti_theft_device"],
-            "winter_tires": confirmed["winter_tires"],
-            "comprehensive_coverage": confirmed["comprehensive_coverage"],
-            "collision_coverage": confirmed["collision_coverage"],
-            "multi_vehicle_discount": confirmed["multi_vehicle_discount"],
-            "multi_policy_discount": confirmed["multi_policy_discount"],
-        }
+        # One canonical profile, built once. Each scraper translates these tokens
+        # into its own site's wording via its VALUE_MAP, so a single answer
+        # reaches ten different forms without ten dialects of if-statements.
+        profile = build_profile(confirmed, age=_age_on(dob))
+        applicant_data = legacy_applicant_dict(profile)
+        logger.info(
+            "canonical profile: age=%s gender=%s married=%s parking=%s use=%s ownership=%s",
+            profile.age, profile.gender, profile.is_married,
+            profile.parking, profile.use, profile.ownership,
+        )
 
         # Ten channels, each driving a browser, run concurrently.
         await self._publish_ui(

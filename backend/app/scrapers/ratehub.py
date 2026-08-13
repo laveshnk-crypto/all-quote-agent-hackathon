@@ -2,7 +2,7 @@
 import re
 from typing import Any, Dict, List
 
-from app.scrapers.rate_page import RatePageScraper, lines_with_money
+from app.scrapers.rate_page import RatePageScraper, lines_with_money, plausible_annual
 
 
 class RatehubScraper(RatePageScraper):
@@ -51,6 +51,11 @@ class RatehubScraper(RatePageScraper):
                 )
             if len(comparisons) >= 4:
                 break
+
+        # A figure outside the credible annual band is a monthly rate or a
+        # coverage limit that happened to sit near the words we matched on.
+        if not plausible_annual(annual):
+            annual = None
 
         return {
             "annual_premium": annual,

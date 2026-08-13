@@ -2,7 +2,7 @@
 import re
 from typing import Any, Dict, List
 
-from app.scrapers.rate_page import RatePageScraper
+from app.scrapers.rate_page import RatePageScraper, first_plausible_annual, plausible_annual
 
 
 class MyChoiceIndexScraper(RatePageScraper):
@@ -34,18 +34,22 @@ class MyChoiceIndexScraper(RatePageScraper):
 
         # City averages read as "Brampton is the most expensive ... at $3,471".
         if city:
-            pattern = rf"{re.escape(city)}[^.$]{{0,80}}\$\s*(\d[\d,]{{2,}})"
-            match = re.search(pattern, flat, re.I)
-            if match:
-                annual = float(match.group(1).replace(",", ""))
+            # The page prints "Toronto $239" (monthly) before "Toronto, ON $2,348"
+            # (annual), so scan for the first figure that is credible as annual.
+            hit = first_plausible_annual(
+                rf"{re.escape(city)}[^.$]{{0,80}}\$\s*(\d[\d,]{{2,}})", flat
+            )
+            if hit:
+                annual, headline = hit[0], hit[1][:220]
                 matched_on = f"MyChoice city average for {city}"
-                headline = match.group(0)[:220]
 
         # Otherwise the headline provincial average.
         if annual is None:
-            match = re.search(r"Average annual premium:?\s*\$\s*(\d[\d,]{2,})", flat, re.I)
-            if match:
-                annual = float(match.group(1).replace(",", ""))
+            hit = first_plausible_annual(
+                r"Average annual premium:?\s*\$\s*(\d[\d,]{2,})", flat
+            )
+            if hit:
+                annual = hit[0]
                 matched_on = "MyChoice Ontario average"
                 yoy = re.search(r"YoY rate change:?\s*([+\-]?[\d.]+%)", flat, re.I)
                 headline = (
