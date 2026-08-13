@@ -58,6 +58,8 @@ page_debug.html
 selects_debug.txt
 *.png
 *.json
+# ...but the submission deliverables are the product, not run debris.
+!submission/*.json
 playwright-report/
 test-results/
 

@@ -1,0 +1,141 @@
+{
+  "generated_at": "2026-08-13T02:38:06+00:00",
+  "run": {
+    "started": "2026-08-13T02:37:43+00:00",
+    "finished": "2026-08-13T02:38:06+00:00",
+    "wall_clock_seconds": 22.4
+  },
+  "profile": {
+    "profile_type": "synthetic test fixture -- not a real person",
+    "age_band": "30-39",
+    "postal_area": "M5V",
+    "city": "Toronto",
+    "vehicle": "2021 HYUNDAI",
+    "redactions_applied": [
+      "date_of_birth -> age band",
+      "postal_code -> forward sortation area (3 chars)",
+      "no name / email / phone / street address (never collected)"
+    ]
+  },
+  "summary": {
+    "channels_run": 12,
+    "channels_with_a_price": 12,
+    "channels_unavailable": [],
+    "cheapest_annual": 1296.0,
+    "cheapest_channel": "Surex.com",
+    "dearest_annual": 3965.0,
+    "average_annual": 2575.25,
+    "spread_annual": 2669.0
+  },
+  "recommended": "hellosafe",
+  "ledger": [
+    {
+      "source_id": "surex",
+      "status": "SUCCESS",
+      "annual_premium": 1296.0,
+      "personalisation": "province",
+      "is_generic": true,
+      "matched_on": "closest Ontario quote: Male, 72, Markham \u00b7 2014 TOYOTA SIENNA CE V6",
+      "landed_at_seconds": 20.5
+    },
+    {
+      "source_id": "insureye",
+      "status": "SUCCESS",
+      "annual_premium": 1920.0,
+      "personalisation": "province",
+      "is_generic": true,
+      "matched_on": "Ontario average",
+      "landed_at_seconds": 21.0
+    },
+    {
+      "source_id": "hellosafe",
+      "status": "SUCCESS",
+      "annual_premium": 1953.0,
+      "personalisation": "city",
+      "is_generic": false,
+      "matched_on": "HelloSafe city average for Toronto",
+      "landed_at_seconds": 16.3
+    },
+    {
+      "source_id": "isure",
+      "status": "SUCCESS",
+      "annual_premium": 2006.0,
+      "personalisation": "province",
+      "is_generic": true,
+      "matched_on": "isure Ontario average",
+      "landed_at_seconds": 22.0
+    },
+    {
+      "source_id": "ratesupermarket",
+      "status": "SUCCESS",
+      "annual_premium": 2235.0,
+      "personalisation": "province",
+      "is_generic": true,
+      "matched_on": "Ontario average",
+      "landed_at_seconds": 22.3
+    },
+    {
+      "source_id": "mychoice",
+      "status": "SUCCESS",
+      "annual_premium": 2671.0,
+      "personalisation": "profile",
+      "is_generic": false,
+      "matched_on": "age band 2, HYUNDAI 2021, M5V",
+      "landed_at_seconds": 15.2
+    },
+    {
+      "source_id": "mychoice_index",
+      "status": "SUCCESS",
+      "annual_premium": 2677.0,
+      "personalisation": "age",
+      "is_generic": false,
+      "matched_on": "age band 25-34",
+      "landed_at_seconds": 15.9
+    },
+    {
+      "source_id": "rates_ca",
+      "status": "SUCCESS",
+      "annual_premium": 2702.0,
+      "personalisation": "postal",
+      "is_generic": false,
+      "matched_on": "postal area M5V",
+      "landed_at_seconds": 6.3
+    },
+    {
+      "source_id": "ratehub",
+      "status": "SUCCESS",
+      "annual_premium": 2810.0,
+      "personalisation": "region",
+      "is_generic": true,
+      "matched_on": "city page average",
+      "landed_at_seconds": 5.5
+    },
+    {
+      "source_id": "lowestrates",
+      "status": "SUCCESS",
+      "annual_premium": 3113.0,
+      "personalisation": "age",
+      "is_generic": false,
+      "matched_on": "closest published quote: 39-year-old driver, 2022 HONDA ACCORD SPORT 2.0 4DR",
+      "landed_at_seconds": 14.8
+    },
+    {
+      "source_id": "insurancehotline",
+      "status": "SUCCESS",
+      "annual_premium": 3555.0,
+      "personalisation": "age",
+      "is_generic": false,
+      "matched_on": "age band 30-39",
+      "landed_at_seconds": 10.0
+    },
+    {
+      "source_id": "fsra_regulatory_benchmark",
+      "status": "SUCCESS",
+      "annual_premium": 3965.0,
+      "personalisation": "profile",
+      "is_generic": false,
+      "matched_on": "age 30-39, FSA M5V, 10,001-20,000 km",
+      "landed_at_seconds": 11.9
+    }
+  ]
+}

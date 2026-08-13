@@ -1,0 +1,387 @@
+{
+  "generated_at": "2026-08-13T02:38:06+00:00",
+  "generator": "submission/generate.py (live verification run)",
+  "province": "Ontario, Canada",
+  "verification_profile": {
+    "profile_type": "synthetic test fixture -- not a real person",
+    "age_band": "30-39",
+    "postal_area": "M5V",
+    "city": "Toronto",
+    "vehicle": "2021 HYUNDAI",
+    "redactions_applied": [
+      "date_of_birth -> age band",
+      "postal_code -> forward sortation area (3 chars)",
+      "no name / email / phone / street address (never collected)"
+    ]
+  },
+  "active_sources": [
+    {
+      "source_id": "fsra_regulatory_benchmark",
+      "name": "FSRA Regulator Rate Ranger",
+      "channel_category": "Regulatory",
+      "urls": [
+        "https://regulatorrateranger.fsrao.ca/"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "profile",
+      "personalisation_label": "Your full profile",
+      "is_generic": false,
+      "required_fields": [
+        "age",
+        "gender",
+        "marital_status",
+        "postal_code",
+        "annual_mileage",
+        "vehicle_model_year",
+        "vehicle_make",
+        "years_licensed",
+        "years_claim_free"
+      ],
+      "limit_note": null,
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "lowestrates",
+      "name": "LowestRates.ca",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://www.lowestrates.ca/insurance/auto/{city}",
+        "https://www.lowestrates.ca/insurance/auto"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "age",
+      "personalisation_label": "Your age band",
+      "is_generic": false,
+      "required_fields": [
+        "city",
+        "age"
+      ],
+      "limit_note": "Their funnel takes your full vehicle profile, but the priced figure comes from their published quote table; the funnel needs contact details to price.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 2
+      }
+    },
+    {
+      "source_id": "rates_ca",
+      "name": "Rates.ca",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://rates.ca/insurance-quotes/auto/{city}",
+        "https://rates.ca/insurance-quotes/auto"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "postal",
+      "personalisation_label": "Your postal area",
+      "is_generic": false,
+      "required_fields": [
+        "city"
+      ],
+      "limit_note": "Their live quote funnel is behind a Cloudflare bot check (HTTP 403), so this is their published rate for your postal area rather than a personal quote.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "ratehub",
+      "name": "Ratehub.ca",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://www.ratehub.ca/insurance/car/{city}",
+        "https://www.ratehub.ca/insurance/car/ontario"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "region",
+      "personalisation_label": "Your region",
+      "is_generic": true,
+      "required_fields": [
+        "city"
+      ],
+      "limit_note": "Ratehub publishes regional averages rather than per-driver rates; their own quote tool needs contact details.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "insurancehotline",
+      "name": "InsuranceHotline.com",
+      "channel_category": "Broker",
+      "urls": [
+        "https://www.insurancehotline.com/car-insurance-quotes-ontario"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "age",
+      "personalisation_label": "Your age band",
+      "is_generic": false,
+      "required_fields": [],
+      "limit_note": "InsuranceHotline publishes averages by age band and region, not per-driver rates.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "mychoice",
+      "name": "MyChoice.ca Calculator",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://www.mychoice.ca/ontario-car-insurance-calculator/"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "profile",
+      "personalisation_label": "Your full profile",
+      "is_generic": false,
+      "required_fields": [
+        "age",
+        "vehicle_year",
+        "vehicle_make",
+        "postal_code",
+        "current_monthly_premium"
+      ],
+      "limit_note": null,
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "mychoice_index",
+      "name": "MyChoice.ca Rate Index",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://www.mychoice.ca/insurance/car/{city}/",
+        "https://www.mychoice.ca/insurance/car/ontario/"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "age",
+      "personalisation_label": "Your age band",
+      "is_generic": false,
+      "required_fields": [],
+      "limit_note": "MyChoice's index publishes averages by age band and city, not per-driver rates.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "hellosafe",
+      "name": "HelloSafe.ca",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://hellosafe.ca/en/car-insurance/{city}",
+        "https://hellosafe.ca/en/car-insurance/ontario"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "city",
+      "personalisation_label": "Your city",
+      "is_generic": false,
+      "required_fields": [],
+      "limit_note": "HelloSafe publishes city averages, not per-driver rates.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 0
+      }
+    },
+    {
+      "source_id": "surex",
+      "name": "Surex.com",
+      "channel_category": "Broker",
+      "urls": [
+        "https://www.surex.com/insurance/auto"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "province",
+      "personalisation_label": "Province-wide average",
+      "is_generic": true,
+      "required_fields": [
+        "age"
+      ],
+      "limit_note": "Surex publishes only a handful of recent Ontario quotes, so the closest one by age can still be far from you.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "isure",
+      "name": "isure.ca",
+      "channel_category": "Broker",
+      "urls": [
+        "https://isure.ca/ontario-car-insurance/"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "province",
+      "personalisation_label": "Province-wide average",
+      "is_generic": true,
+      "required_fields": [],
+      "limit_note": "isure publishes only a provincial average, with no breakdown to match against.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 0
+      }
+    },
+    {
+      "source_id": "ratesupermarket",
+      "name": "RateSupermarket.ca",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://www.ratesupermarket.ca/car_insurance"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "province",
+      "personalisation_label": "Province-wide average",
+      "is_generic": true,
+      "required_fields": [],
+      "limit_note": "RateSupermarket publishes averages rather than per-driver rates.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 1
+      }
+    },
+    {
+      "source_id": "insureye",
+      "name": "InsurEye.com",
+      "channel_category": "Aggregator",
+      "urls": [
+        "https://www.insureye.com/car-insurance-ontario/"
+      ],
+      "status": "verified",
+      "last_run_status": "SUCCESS",
+      "verified_at": "2026-08-13T02:38:06+00:00",
+      "personalisation": "province",
+      "personalisation_label": "Province-wide average",
+      "is_generic": true,
+      "required_fields": [],
+      "limit_note": "InsurEye publishes averages by city and age band, not per-driver rates.",
+      "evidence": {
+        "result_screenshot": true,
+        "entry_screenshots": 0
+      }
+    }
+  ],
+  "rejected_candidates": [
+    {
+      "name": "Forbes Advisor Canada",
+      "url": "https://www.forbes.com/advisor/ca/car-insurance/car-insurance-ontario/",
+      "reason": "HTTP 403 -- automation blocked",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "RateLab.ca",
+      "url": "https://ratelab.ca/car-insurance-ontario/",
+      "reason": "HTTP 403 -- automation blocked",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "NerdWallet Canada",
+      "url": "https://www.nerdwallet.com/ca/insurance/car-insurance-ontario",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "WOWA",
+      "url": "https://wowa.ca/insurance/car-insurance-ontario",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Finder Canada",
+      "url": "https://www.finder.com/ca/car-insurance-ontario",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "MoneySense",
+      "url": "https://www.moneysense.ca/save/insurance/car-insurance-ontario/",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Insurdinary",
+      "url": "https://insurdinary.ca/car-insurance-ontario/",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "BrokerLink",
+      "url": "https://www.brokerlink.ca/insurance/car-insurance/ontario",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Youngs Insurance",
+      "url": "https://www.youngsinsurance.ca/personal-insurance/auto-insurance",
+      "reason": "HTTP 404 -- page gone",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Sonnet",
+      "url": "https://www.sonnet.ca/auto-insurance/ontario",
+      "reason": "no published rate figures; quote funnel requires contact details (lead generation)",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Onlia",
+      "url": "https://www.onlia.ca/car-insurance",
+      "reason": "no published rate figures; quote funnel requires contact details",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "CAA Insurance",
+      "url": "https://www.caainsurancecompany.com/auto-insurance",
+      "reason": "no published rate figures; member pricing behind membership",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Zensurance",
+      "url": "https://www.zensurance.com/",
+      "reason": "commercial lines only; no personal auto rate data",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "ThinkInsure",
+      "url": "https://www.thinkinsure.ca/insurance-quotes/car-insurance-toronto.html",
+      "reason": "no published rate figures on probed pages",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Kanetix",
+      "url": "https://www.kanetix.ca/car-insurance",
+      "reason": "serves identical data to RateSupermarket -- duplicate, not a distinct source",
+      "probed_at": "2026-08-12"
+    },
+    {
+      "name": "Rates.ca live quote funnel",
+      "url": "https://quotes.rates.ca/autoquote",
+      "reason": "HTTP 403 behind Cloudflare human-verification challenge; the registry entry for rates_ca reads their public postal-area rate page instead",
+      "probed_at": "2026-08-12"
+    }
+  ]
+}
