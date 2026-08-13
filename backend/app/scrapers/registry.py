@@ -48,7 +48,11 @@ CHANNEL_TIMEOUT_S = 120.0
 
 # Channels actively driving a browser at once. The rest queue for a slot, and
 # their clock does not start until they get one.
-CHANNEL_CONCURRENCY = 6
+#
+# Four rather than six: this runs on the same machine as the voice session, and
+# six pages laying out simultaneously starved the audio pipeline enough to make
+# the agent's speech stutter. The full run is only a couple of seconds slower.
+CHANNEL_CONCURRENCY = 4
 
 
 def channel_directory() -> List[Dict[str, Any]]:

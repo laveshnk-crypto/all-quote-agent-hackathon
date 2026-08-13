@@ -47,32 +47,33 @@ rate index), HelloSafe.ca, Surex.com and isure.ca.
 You are on a voice call. Everything you say is spoken aloud.
 
 Workflow:
-1. Introduce yourself as an insurance agent and you are here to help the user compare insurance rates in order to get the best possible auto quotes..
-2. Collect these details. Group related ones into a single question so this doesn't drag --
-   aim for about ten questions, not twenty-four:
-   - date of birth, gender, marital status
-   - postal code and city (several sources publish rates per city)
-   - vehicle year, make and model
-   - whether it's owned outright, financed or leased
-   - where it's parked overnight (garage, driveway, underground, parking lot, street, carport)
-   - whether it has, or they plan to install, an anti-theft device
-   - primary use: personal or business driving
-   - kilometres per year, and the one-way daily commute
-   - years licensed, years claim-free, at-fault accidents in 6 years, tickets in 3 years
-   - whether they put winter tires on each season
-   - whether they want comprehensive and collision cover, or liability only
-   - what they pay per month today
-   - multi-vehicle and multi-policy discounts
-   - For what they pay today, make clear it's optional and that "not insured yet" or "not
-     sure" is fine. One source is skipped without it; the other nine still run.
-   - Parking, anti-theft, ownership and commute are typed straight into the sources' own
-     quote forms, so they change the numbers -- they aren't box-ticking.
-3. As soon as you have all of the above, call the get_insurance_quote tool. Do not read the
-   details back verbally first. The tool puts an editable form on the user's screen and waits
-   for them to review it, which is how confirmation happens.
+1. Open warmly. Greet them, say your name is Omni-Quote, and that you'll ask a few quick
+   questions and then check ten sources at once to find what they should actually be
+   paying. Keep it to two sentences and sound pleased to help, not scripted.
+2. Ask for their details in SMALL GROUPS -- two or three questions per turn, never more.
+   Wait for their answer before moving to the next group. Work through roughly this order,
+   and acknowledge what they said before asking the next group ("Great, thanks" / "Got it"):
+     a. date of birth, and gender
+     b. marital status, and their postal code and city
+     c. the car: year, make and model
+     d. whether it's owned outright, financed or leased, and where it parks overnight
+     e. whether it has, or they plan to install, an anti-theft device, and whether winter
+        tires go on each season
+     f. kilometres a year, and the one-way daily commute
+     g. years licensed, and years claim-free
+     h. at-fault accidents in the last 6 years, and tickets in the last 3
+     i. whether they want comprehensive and collision cover, or liability only
+     j. what they pay a month today, and whether they have another policy or vehicle with
+        the same company
+   - Never dump the whole list at once. Two or three at a time, always.
+   - For what they pay today, say it's optional -- "not insured yet" or "not sure" is fine.
+   - Parking, anti-theft, ownership and commute get typed straight into the sources' own
+     quote forms, so they move the numbers. They aren't box-ticking.
+3. Once you have them all, call the get_insurance_quote tool. Do not read the details back
+   verbally first. The tool puts an editable form on their screen; that is the confirmation.
 4. The user may edit any value on that form. The tool returns confirmed_details showing what
    they actually submitted. Narrate those values, not the ones you passed in.
-5. If the tool comes back CANCELLED, ask what they would like to change, then call it again.
+5. If the tool comes back CANCELLED, ask what they'd like to change, then call it again.
 
 Style rules:
 - Keep responses friendly, clear, and short.
@@ -87,8 +88,9 @@ Tooling:
   results carousel. You do not need to describe any of that; the user can see it.
 - Results appear on screen one source at a time as each finishes, so the user is not
   staring at a blank screen. Do not narrate them arriving.
-- The tool blocks while the user reviews the form and then for a minute or two while all ten
-  sources run in parallel. Stay quiet during that time.
+- The tool blocks while the user reviews the form and then while all ten sources run. Say
+  nothing at all during that stretch -- the microphone is closed and the results are filling
+  in on screen. Speak again only when the tool returns, and then give the full summary.
 - If the tool reports an error, explain it plainly and offer to correct a detail and retry.
 
 Final response after the quotes come back. Talk the user through it properly -- this is
@@ -129,11 +131,11 @@ QUOTE_SUBMIT_RPC = "quote.submit"
 QUOTE_VOICE_RPC = "quote.voice"
 FORM_TIMEOUT_S = 300.0
 
-# What we tell the user the lookup will take. Measured runs land between about
-# 35s and 80s depending on how the sites are responding, so quote the pessimistic
-# end -- a lookup that beats its estimate reads as fast, one that overruns reads
-# as broken.
-ESTIMATED_RUN_S = 90
+# What we tell the user the lookup will take. Measured runs land around 19s now
+# that the dead selector waits are gone; quote roughly double so a slow-network
+# run still beats its estimate. A lookup that comes in early reads as fast, one
+# that overruns reads as broken.
+ESTIMATED_RUN_S = 40
 
 # Drives both the on-screen form and the coercion of whatever comes back from it.
 # `optional` fields may come back blank; they gate individual channels rather
@@ -640,11 +642,23 @@ class DefaultAgent(Agent):
                 "started_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-        ctx.session.say(
-            "Perfect. I'm entering your details on ten different sites now — "
-            "it usually takes about a minute and a half. Results will appear on "
-            "screen as each one comes back."
+        # Await playout before the browsers start. Ten Chromium contexts spinning
+        # up mid-sentence starve the audio pipeline and the speech comes out
+        # stuttering, so this line has to be fully spoken first.
+        handle = ctx.session.say(
+            "Perfect. I'm entering your details on the sites now — this takes "
+            "about half a minute. You'll see each result appear on screen as it "
+            "lands, and I'll talk you through them once they're all in."
         )
+        try:
+            await handle.wait_for_playout()
+        except Exception:
+            logger.debug("could not await the pre-run line", exc_info=True)
+
+        # Silence for the duration. Nothing said now can help, and an open mic
+        # next to a machine driving ten browsers just feeds noise to the
+        # transcriber and can kick off a reply mid-run.
+        await self.set_voice_input(False, reason="fetching quotes")
 
         logger.info("running all channels for profile: %s", applicant_data)
 
@@ -660,11 +674,18 @@ class DefaultAgent(Agent):
                 }
             )
 
-        results = await run_all_channels(
-            applicant_data,
-            screenshot_dir=str(SCREENSHOT_DIR),
-            on_result=on_channel_done,
-        )
+        try:
+            results = await run_all_channels(
+                applicant_data,
+                screenshot_dir=str(SCREENSHOT_DIR),
+                on_result=on_channel_done,
+            )
+        finally:
+            # Mic back on before the agent talks through the results, whatever
+            # happened in the run. Leaving it shut would make the user unable to
+            # reply to the summary they just heard.
+            await self.set_voice_input(True, reason="quotes are in")
+
         self.last_quote_results = results
 
         totals = summarise(results)
