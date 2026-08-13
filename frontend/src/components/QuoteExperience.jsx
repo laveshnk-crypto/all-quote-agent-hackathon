@@ -1,12 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDataChannel, useRoomContext, useVoiceAssistant } from '@livekit/components-react';
 
+import lucideBot from '../assets/lucide--bot.svg';
 import QuoteCarousel from './QuoteCarousel.jsx';
 import QuoteTable from './QuoteTable.jsx';
 import './QuoteExperience.css';
 
 const QUOTE_UI_TOPIC = 'quote.ui';
 const QUOTE_SUBMIT_RPC = 'quote.submit';
+const QUOTE_VOICE_RPC = 'quote.voice';
 // Screenshots are served by the FastAPI backend, not the Vite dev server.
 // Baked in at build time by Vite; docker-compose passes it as a build arg.
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8001';
@@ -147,6 +149,7 @@ export default function QuoteExperience() {
   const [view, setView] = useState('cards');
   const [landed, setLanded] = useState([]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   useDataChannel(QUOTE_UI_TOPIC, (msg) => {
     let payload;
@@ -154,6 +157,12 @@ export default function QuoteExperience() {
       payload = JSON.parse(new TextDecoder().decode(msg.payload));
     } catch (err) {
       console.error('Unreadable quote UI message', err);
+      return;
+    }
+
+    if (payload.phase === 'voice') {
+      // Mic state travels on its own message so it never clobbers the phase.
+      setVoiceEnabled(Boolean(payload.enabled));
       return;
     }
 
@@ -180,16 +189,42 @@ export default function QuoteExperience() {
     }
   });
 
+  const agentIdentity =
+    agent?.identity ?? [...room.remoteParticipants.values()][0]?.identity;
+
+  // Follow the agent's mic state with the real microphone. The agent ignoring
+  // input is what actually pauses the conversation; muting locally makes that
+  // visible, and stops the tab's mic indicator staying lit while nobody listens.
+  useEffect(() => {
+    room.localParticipant?.setMicrophoneEnabled(voiceEnabled).catch(() => {});
+  }, [room, voiceEnabled]);
+
   const handleChange = useCallback((key, value) => {
     setValues((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  const resumeVoice = useCallback(async () => {
+    if (!agentIdentity) return;
+    // Optimistic: the agent confirms with its own voice message straight after.
+    setVoiceEnabled(true);
+    try {
+      await room.localParticipant.performRpc({
+        destinationIdentity: agentIdentity,
+        method: QUOTE_VOICE_RPC,
+        payload: JSON.stringify({ action: 'resume' }),
+        responseTimeout: 8000,
+      });
+    } catch (err) {
+      console.error('Could not re-open the microphone', err);
+      setVoiceEnabled(false);
+    }
+  }, [agentIdentity, room]);
 
   const handleSubmit = useCallback(
     async (action) => {
       // The form only ever appears because the agent published it, so if
       // useVoiceAssistant hasn't resolved yet the sole remote peer is the agent.
-      const destinationIdentity =
-        agent?.identity ?? [...room.remoteParticipants.values()][0]?.identity;
+      const destinationIdentity = agentIdentity;
 
       if (!destinationIdentity) {
         console.error('No agent participant to submit the quote form to');
@@ -211,7 +246,7 @@ export default function QuoteExperience() {
         setBusy(false);
       }
     },
-    [agent?.identity, room, values],
+    [agentIdentity, room, values],
   );
 
   const body = useMemo(() => {
@@ -265,5 +300,20 @@ export default function QuoteExperience() {
 
   if (!body) return null;
 
-  return <div className="quote-stage">{body}</div>;
+  return (
+    <div className={`quote-stage ${voiceEnabled ? '' : 'quote-stage--with-mic'}`}>
+      {!voiceEnabled && (
+        <button
+          type="button"
+          className="quote-mic"
+          onClick={resumeVoice}
+          aria-label="Start talking to the agent again"
+        >
+          <img src={lucideBot} alt="" aria-hidden="true" />
+          <span>Tap to talk</span>
+        </button>
+      )}
+      {body}
+    </div>
+  );
 }

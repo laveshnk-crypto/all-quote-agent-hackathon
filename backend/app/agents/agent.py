@@ -90,14 +90,27 @@ Tooling:
   sources run in parallel. Stay quiet during that time.
 - If the tool reports an error, explain it plainly and offer to correct a detail and retry.
 
-Final response after the quotes come back:
-- Lead with the cheapest source and its annual figure, then the spread across all sources.
-- Say how many of the ten returned a price, and name any that didn't and why, briefly.
+Final response after the quotes come back. Talk the user through it properly -- this is
+the part they waited for, so give it four or five sentences, not one:
+- Start with the best option in the `best` field: name the source, the annual figure and
+  roughly what that is per month, and what coverage level it reflects.
+- Say what that quote was matched on, from `best.matched_on`, so they know how close a fit
+  it is to them. If it was matched on someone materially different -- a much older driver,
+  a city-wide average rather than their own profile -- say so plainly. Do not oversell it.
+- Put it in context: how much below the average of all the sources it is, and what the
+  spread between cheapest and priciest was. A wide spread is the useful finding, because it
+  means shopping around is worth real money to them.
+- Mention one or two of the other notable results, especially any regulator or benchmark
+  figure, so the best one has something to sit against.
+- Say how many of the ten returned a price, and briefly name any that didn't and why.
 - Never invent a figure for a source that returned nothing; call it unavailable and move on.
-- Tell the user they can swipe through the cards, or open the table to compare all ten
-  side by side, where the best rate is highlighted in gold.
-- Be clear these are benchmarks and published averages, not binding quotes from an insurer.
-- Offer to re-run with different details, such as lower mileage or added discounts.
+- Tell them they can swipe the cards, or open the table to compare all ten side by side,
+  where the best rate is highlighted in gold and every row links to a screenshot of the
+  page its number came from.
+- Be clear these are benchmarks and published averages, not binding quotes from an insurer,
+  and that an actual policy needs a real application.
+- Offer to re-run with different details, such as lower mileage, a garage, or added
+  discounts, and say the mic is open again.
 """
 
 
@@ -107,6 +120,7 @@ SCREENSHOT_DIR = BACKEND_ROOT / "app" / "scrapers" / "screenshots"
 # confirms the on-screen form.
 QUOTE_UI_TOPIC = "quote.ui"
 QUOTE_SUBMIT_RPC = "quote.submit"
+QUOTE_VOICE_RPC = "quote.voice"
 FORM_TIMEOUT_S = 300.0
 
 # Drives both the on-screen form and the coercion of whatever comes back from it.
@@ -323,13 +337,49 @@ class DefaultAgent(Agent):
         self._ctx = ctx
         # Resolved by the browser's RPC reply while a form is on screen.
         self._pending_form: Optional[asyncio.Future] = None
+        self._voice_enabled = True
         # Full per-channel payloads from the most recent run, including artifact paths.
         self.last_quote_results: Optional[List[Dict[str, Any]]] = None
 
     def register_rpc(self) -> None:
-        self._ctx.room.local_participant.register_rpc_method(
-            QUOTE_SUBMIT_RPC, self._on_form_submit
-        )
+        local = self._ctx.room.local_participant
+        local.register_rpc_method(QUOTE_SUBMIT_RPC, self._on_form_submit)
+        local.register_rpc_method(QUOTE_VOICE_RPC, self._on_voice_toggle)
+
+    async def _on_voice_toggle(self, data: rtc.RpcInvocationData) -> str:
+        """User tapped the mic button to start or stop talking to us."""
+        try:
+            payload = json.loads(data.payload)
+        except json.JSONDecodeError:
+            return json.dumps({"ok": False, "reason": "malformed payload"})
+
+        enable = payload.get("action") != "pause"
+        await self.set_voice_input(enable, reason="user tapped the mic")
+        if enable:
+            # Acknowledge out loud so it's obvious the mic is live again.
+            self.session.generate_reply(
+                instructions=(
+                    "The user just re-opened the microphone while their details "
+                    "are on screen. Briefly say you're listening and ask what "
+                    "they'd like to change. One short sentence."
+                )
+            )
+        return json.dumps({"ok": True, "enabled": enable})
+
+    async def set_voice_input(self, enabled: bool, *, reason: str = "") -> None:
+        """Open or close the mic, and tell the UI which it is.
+
+        While the form is up there is nothing useful to say to us -- the answers
+        are being edited on screen -- and an open mic just feeds room noise into
+        the transcriber. The UI shows a mic button so the user can re-open it.
+        """
+        try:
+            self.session.input.set_audio_enabled(enabled)
+        except Exception:
+            logger.exception("could not set audio input enabled=%s", enabled)
+        self._voice_enabled = enabled
+        logger.info("voice input %s (%s)", "on" if enabled else "off", reason)
+        await self._publish_ui({"phase": "voice", "enabled": enabled})
 
     async def _on_form_submit(self, data: rtc.RpcInvocationData) -> str:
         """Browser calls this when the user confirms or cancels the on-screen form."""
@@ -357,6 +407,9 @@ class DefaultAgent(Agent):
         self._pending_form = future
 
         await self._publish_ui({"phase": "form", "fields": FORM_FIELDS, "values": values})
+        # Nothing said out loud can help while the form is being edited, and an
+        # open mic here just feeds room noise to the transcriber.
+        await self.set_voice_input(False, reason="form on screen")
 
         try:
             return await asyncio.wait_for(future, timeout=FORM_TIMEOUT_S)
@@ -368,6 +421,8 @@ class DefaultAgent(Agent):
             )
         finally:
             self._pending_form = None
+            # However the wait ended, the user gets their microphone back.
+            await self.set_voice_input(True, reason="form closed")
 
     async def on_enter(self):
         await self.session.generate_reply(
@@ -565,18 +620,48 @@ class DefaultAgent(Agent):
         cards = [_quote_card(r) for r in results]
         await self._publish_ui({"phase": "result", "summary": totals, "quotes": cards})
 
-        # Keep the spoken payload small: the cards are already on screen.
+        # The cards are already on screen, so the spoken payload stays small --
+        # except for the winner, which gets the detail needed to talk about it.
+        best = next((c for c in cards if c.get("is_recommended")), None)
+
         return {
             "status": "SUCCESS",
             "currency": "CAD",
             "period": "annual",
             "summary": totals,
+            "best": (
+                {
+                    "channel": best["channel_name"],
+                    "channel_type": best["channel_category"],
+                    "annual_premium": best["annual_premium"],
+                    "monthly_premium": best["monthly_premium"],
+                    "headline": best["headline"],
+                    "matched_on": best["matched_on"],
+                    "coverage": (
+                        "comprehensive and collision"
+                        if confirmed.get("comprehensive_coverage")
+                        and confirmed.get("collision_coverage")
+                        else "mandatory coverage only"
+                    ),
+                    "versus_average": (
+                        round(totals["average_annual"] - best["annual_premium"], 2)
+                        if totals.get("average_annual") and best.get("annual_premium")
+                        else None
+                    ),
+                }
+                if best
+                else None
+            ),
             "quotes": [
                 {
                     "channel": c["channel_name"],
+                    "type": c["channel_category"],
                     "status": c["status"],
                     "annual_premium": c["annual_premium"],
+                    "monthly_premium": c["monthly_premium"],
+                    "matched_on": c["matched_on"],
                     "headline": c["headline"],
+                    "unavailable_reason": c["unavailable_reason"],
                 }
                 for c in cards
             ],

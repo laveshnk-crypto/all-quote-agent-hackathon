@@ -352,3 +352,93 @@
   animation: none;
   transition: width 0.4s ease;
 }
+
+/* ---------- paused-mic button ---------- */
+
+/* A small echo of the main bot button. It only exists while the agent has
+   stopped listening, so its presence is the signal that the mic is closed. */
+/* The mic button is fixed at the top, so the stage has to give it room or a
+   full-height card slides underneath it. */
+.quote-stage--with-mic {
+  padding-top: 86px;
+}
+
+.quote-stage--with-mic .quote-card,
+.quote-stage--with-mic .qt {
+  max-height: calc(100svh - 110px);
+}
+
+.quote-mic {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px 8px 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-h);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  animation: quote-mic-in 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.quote-mic img {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+}
+
+/* The ring breathes so a muted mic reads as paused, not broken. */
+.quote-mic::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-border);
+  opacity: 0;
+  animation: quote-mic-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.quote-mic:hover {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 4px var(--accent-bg), var(--shadow);
+}
+
+.quote-mic:active {
+  transform: translateX(-50%) translateY(1px);
+}
+
+.quote-mic:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@keyframes quote-mic-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+}
+
+@keyframes quote-mic-pulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quote-mic,
+  .quote-mic::before {
+    animation: none;
+  }
+}
