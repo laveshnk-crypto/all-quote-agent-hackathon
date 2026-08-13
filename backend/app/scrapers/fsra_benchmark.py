@@ -256,6 +256,9 @@ class FSRABenchmarkScraper(BaseScraper):
                         "results_file_path": result_file_path,
                     },
                     screenshot_path=screenshot_path,
+                    # Nine of the applicant's own answers go into the regulator's
+                    # form; nothing here is a population average.
+                    personalisation="profile",
                 )
 
         except Exception as e:

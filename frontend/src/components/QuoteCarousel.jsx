@@ -39,7 +39,17 @@ function QuoteCard({ quote, isCheapest, apiBase }) {
             {monthly !== null && <em>about {money(monthly)}/month</em>}
           </div>
 
+          {quote.personalisation_label && (
+            <p className="qc-card__basis">
+              <span className={quote.is_generic ? 'is-generic' : 'is-personal'}>
+                {quote.personalisation_label}
+              </span>
+              {quote.is_generic && <em>an average, not a quote for you</em>}
+            </p>
+          )}
+
           {quote.headline && <p className="qc-card__headline">{quote.headline}</p>}
+          {quote.limit_note && <p className="qc-card__limit">{quote.limit_note}</p>}
           {quote.matched_on && (
             <p className="qc-card__matched">
               <span>Matched on</span> {quote.matched_on}

@@ -213,6 +213,9 @@ class RatePageScraper(BaseScraper):
                         or f"{self.channel_name} published rate data.",
                         evidence_payload=payload,
                         screenshot_path=screenshot_path,
+                        # Each parser reports how closely it matched; without a
+                        # claim we assume the weakest, never the strongest.
+                        personalisation=parsed.get("personalisation", "province"),
                     )
 
             return self.build_result(
@@ -262,6 +265,41 @@ def first_plausible_annual(pattern: str, text: str, flags: int = re.I) -> Option
         if plausible_annual(amount):
             return amount, match.group(0)
     return None
+
+
+def age_band_premium(text: str, age: int) -> Optional[tuple]:
+    """Annual premium for the band this age falls in.
+
+    Several sites print an age table ("20-24 $4,724 / 25-34 $3,555"). Matching
+    the applicant's own band is the difference between a quote for them and a
+    quote for the average driver in the province.
+    """
+    best = None
+    for match in re.finditer(
+        r"\b(\d{2})\s*(?:-|to|\u2013)\s*(\d{2})\b[^\n]{0,70}?\$\s*(\d[\d,]{2,})", text
+    ):
+        low, high, amount = int(match.group(1)), int(match.group(2)), float(match.group(3).replace(",", ""))
+        if low <= age <= high and ANNUAL_MIN <= amount <= ANNUAL_MAX:
+            best = (amount, f"{low}-{high}", match.group(0)[:120])
+            break
+    if best:
+        return best
+    # "65+" style open-ended top band
+    for match in re.finditer(r"\b(\d{2})\s*\+[^\n]{0,70}?\$\s*(\d[\d,]{2,})", text):
+        low, amount = int(match.group(1)), float(match.group(2).replace(",", ""))
+        if age >= low and ANNUAL_MIN <= amount <= ANNUAL_MAX:
+            return amount, f"{low}+", match.group(0)[:120]
+    return None
+
+
+def city_premium(text: str, city: str) -> Optional[tuple]:
+    """Annual premium printed against this city name."""
+    if not city:
+        return None
+    hit = first_plausible_annual(
+        rf"\b{re.escape(city)}\b[^\n]{{0,70}}?\$\s*(\d[\d,]{{2,}})", text
+    )
+    return (hit[0], hit[1][:140]) if hit else None
 
 
 def lines_with_money(text: str, *, keywords: str) -> List[str]:

@@ -260,6 +260,7 @@ class MyChoiceScraper(BaseScraper):
                     evidence_summary=headline,
                     evidence_payload=payload,
                     screenshot_path=screenshot_path,
+                    personalisation="profile",
                 )
 
         except Exception as exc:

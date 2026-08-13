@@ -16,6 +16,24 @@ USER_AGENT = (
 #: Screenshots are served to the browser from here (see app/main.py).
 ARTIFACT_URL_PREFIX = "/artifacts"
 
+# How closely a figure was matched to *this* applicant, best first. A quote is
+# only as good as what it was matched on, and a province-wide average dressed up
+# as "your quote" is the most misleading thing this pipeline could produce -- so
+# every result has to declare which of these it is, and the UI shows it.
+PERSONALISATION = {
+    "profile":  "Your full profile",
+    "postal":   "Your postal area",
+    "age":      "Your age band",
+    "vehicle":  "Your vehicle",
+    "city":     "Your city",
+    "region":   "Your region",
+    "province": "Province-wide average",
+}
+PERSONALISATION_RANK = {key: i for i, key in enumerate(PERSONALISATION)}
+
+#: Anything at or below this rank is a generic figure, not a quote for this person.
+GENERIC_FROM = PERSONALISATION_RANK["region"]
+
 
 class BaseScraper(ABC):
     channel_id: str
@@ -26,6 +44,11 @@ class BaseScraper(ABC):
     # never run with a value it wasn't given -- it reports REJECTED instead of
     # quietly substituting a placeholder, which would produce a fake quote.
     required_fields: List[str] = []
+
+    # Why this channel cannot match more closely than it does -- a blocked
+    # funnel, a page that only publishes averages. Surfaced in the results table
+    # so a generic figure always arrives with its reason attached.
+    limit_note: Optional[str] = None
 
     # This site's dialect: canonical token -> the exact string this site's form
     # uses. Declared per scraper so one applicant answer reaches every site in
@@ -240,6 +263,7 @@ class BaseScraper(ABC):
         evidence_summary: Optional[str] = None,
         evidence_payload: Optional[Dict[str, Any]] = None,
         screenshot_path: Optional[str] = None,
+        personalisation: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Ensures every route returns standardized evidence fields.
 
@@ -249,8 +273,17 @@ class BaseScraper(ABC):
         if status != "SUCCESS":
             annual_premium = None
             monthly_premium = None
+            personalisation = None
+
+        level = personalisation if personalisation in PERSONALISATION else None
+        rank = PERSONALISATION_RANK.get(level) if level else None
 
         return {
+            "personalisation": level,
+            "personalisation_label": PERSONALISATION.get(level) if level else None,
+            "limit_note": self.limit_note,
+            # True when the figure describes a population rather than this person.
+            "is_generic": (rank is not None and rank >= GENERIC_FROM),
             "channel_id": self.channel_id,
             "channel_name": self.channel_name,
             "channel_category": self.channel_category,

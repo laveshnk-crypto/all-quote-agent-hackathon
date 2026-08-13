@@ -12,6 +12,8 @@ class IsureScraper(RatePageScraper):
     channel_name = "isure.ca"
     channel_category = "Broker"
 
+    limit_note = "isure publishes only a provincial average, with no breakdown to match against."
+
     city_url_template = None
     fallback_url = "https://isure.ca/ontario-car-insurance/"
 

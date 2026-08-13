@@ -67,6 +67,7 @@ export default function QuoteTable({ summary, quotes, apiBase, onBack }) {
                 Per month
               </th>
               <th scope="col">Matched on</th>
+              <th scope="col">Basis</th>
               <th scope="col">Proof</th>
             </tr>
           </thead>
@@ -114,6 +115,22 @@ export default function QuoteTable({ summary, quotes, apiBase, onBack }) {
                       q.matched_on || '—'
                     )}
                   </td>
+                  <td className="qt__basis">
+                    {q.personalisation_label ? (
+                      <>
+                        <span className={`qt__tag ${q.is_generic ? 'is-generic' : 'is-personal'}`}>
+                          {q.personalisation_label}
+                        </span>
+                        {q.limit_note && (
+                          <span className="qt__why" title={q.limit_note}>
+                            why?
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="qt__null">—</span>
+                    )}
+                  </td>
                   <td>
                     {q.screenshot_url ? (
                       <button
@@ -136,8 +153,9 @@ export default function QuoteTable({ summary, quotes, apiBase, onBack }) {
       </div>
 
       <p className="qt__foot">
-        Benchmarks and published averages, not binding quotes. Every figure links to a
-        screenshot of the page it was read from.
+        <b>Basis</b> says what each figure was matched to. Rows marked as an average
+        describe a population, not you — hover <i>why?</i> for the reason that source
+        could not go closer. Every figure links to a screenshot of the page it came from.
       </p>
 
       {proof && (

@@ -28,6 +28,11 @@ class RatesCaScraper(RatePageScraper):
     channel_name = "Rates.ca"
     channel_category = "Aggregator"
 
+    limit_note = (
+        "Their live quote funnel is behind a Cloudflare bot check (HTTP 403), so this "
+        "is their published rate for your postal area rather than a personal quote."
+    )
+
     city_url_template = "https://rates.ca/insurance-quotes/auto/{city}"
     fallback_url = "https://rates.ca/insurance-quotes/auto"
 
@@ -102,4 +107,8 @@ class RatesCaScraper(RatePageScraper):
             "headline": headline,
             "comparisons": comparisons,
             "matched_on": matched_on if annual else None,
+            "personalisation": (
+                ("postal" if matched_on.startswith("postal") else "city")
+                if annual else None
+            ),
         }

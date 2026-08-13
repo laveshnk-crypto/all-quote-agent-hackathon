@@ -31,6 +31,11 @@ class SurexScraper(RatePageScraper):
     channel_name = "Surex.com"
     channel_category = "Broker"
 
+    limit_note = (
+        "Surex publishes only a handful of recent Ontario quotes, so the closest one "
+        "by age can still be far from you."
+    )
+
     city_url_template = None
     fallback_url = "https://www.surex.com/insurance/auto"
 
@@ -105,4 +110,9 @@ class SurexScraper(RatePageScraper):
                 if s is not best
             ][:4],
             "matched_on": matched,
+            # Only a handful of Ontario samples are published, so the nearest one
+            # can be decades away. Claiming an age match then would overstate it.
+            "personalisation": (
+                "age" if target_age and abs(best["age"] - target_age) <= 10 else "province"
+            ),
         }

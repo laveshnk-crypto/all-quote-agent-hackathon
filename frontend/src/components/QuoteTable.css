@@ -319,3 +319,38 @@
     animation: none;
   }
 }
+
+/* What a figure was matched to. A population average has to look different
+   from a rate priced for this person, or the table quietly implies they are
+   the same thing. */
+.qt__basis { white-space: nowrap; }
+
+.qt__tag {
+  display: inline-block;
+  padding: 2px 9px;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.qt__tag.is-personal {
+  color: var(--qt-under);
+  background: color-mix(in srgb, var(--qt-under) 12%, transparent);
+  border-color: color-mix(in srgb, var(--qt-under) 40%, transparent);
+}
+
+.qt__tag.is-generic {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.qt__why {
+  margin-left: 6px;
+  font-size: 11px;
+  font-style: italic;
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+  opacity: 0.75;
+}

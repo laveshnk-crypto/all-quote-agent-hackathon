@@ -17,12 +17,14 @@ from app.scrapers.browser import BrowserPool
 from app.scrapers.fsra_benchmark import FSRABenchmarkScraper
 from app.scrapers.hellosafe import HelloSafeScraper
 from app.scrapers.insurancehotline import InsuranceHotlineScraper
+from app.scrapers.insureye import InsureyeScraper
 from app.scrapers.isure import IsureScraper
 from app.scrapers.lowestrates import LowestRatesScraper
 from app.scrapers.mychoice import MyChoiceScraper
 from app.scrapers.mychoice_index import MyChoiceIndexScraper
 from app.scrapers.ratehub import RatehubScraper
 from app.scrapers.rates_ca import RatesCaScraper
+from app.scrapers.ratesupermarket import RateSupermarketScraper
 from app.scrapers.surex import SurexScraper
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,8 @@ SCRAPERS: List[Type[BaseScraper]] = [
     HelloSafeScraper,
     SurexScraper,
     IsureScraper,
+    RateSupermarketScraper,
+    InsureyeScraper,
 ]
 
 # How long a channel gets *once it starts working*. This deliberately excludes
@@ -157,10 +161,16 @@ async def run_all_channels(
     ordered = sorted(results, key=sort_key)
 
     # Flag the recommendation so the UI and the agent agree on one winner.
+    # A personalised figure beats a cheaper population average: recommending a
+    # 72-year-old's quote to a 30-year-old because it is the lowest number on
+    # the page is exactly the mistake this flag exists to prevent.
+    def recommendable(result: Dict[str, Any]) -> bool:
+        return result.get("status") == "SUCCESS" and bool(result.get("annual_premium"))
+
     cheapest_id = next(
-        (r["channel_id"] for r in ordered if r.get("status") == "SUCCESS" and r.get("annual_premium")),
+        (r["channel_id"] for r in ordered if recommendable(r) and not r.get("is_generic")),
         None,
-    )
+    ) or next((r["channel_id"] for r in ordered if recommendable(r)), None)
     for result in ordered:
         result["is_recommended"] = result.get("channel_id") == cheapest_id
 

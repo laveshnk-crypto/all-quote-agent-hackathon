@@ -2,7 +2,9 @@
 import re
 from typing import Any, Dict, List
 
-from app.scrapers.rate_page import RatePageScraper, first_plausible_annual, plausible_annual
+from app.scrapers.rate_page import (
+    RatePageScraper, age_band_premium, first_plausible_annual, plausible_annual,
+)
 
 
 class MyChoiceIndexScraper(RatePageScraper):
@@ -17,7 +19,11 @@ class MyChoiceIndexScraper(RatePageScraper):
     channel_name = "MyChoice.ca Rate Index"
     channel_category = "Aggregator"
 
-    city_url_template = None
+    # The city page carries 31 city figures and an age table; the province page
+    # only has the provincial average.
+    limit_note = "MyChoice's index publishes averages by age band and city, not per-driver rates."
+
+    city_url_template = "https://www.mychoice.ca/insurance/car/{city}/"
     fallback_url = "https://www.mychoice.ca/insurance/car/ontario/"
 
     required_fields = []
@@ -31,6 +37,25 @@ class MyChoiceIndexScraper(RatePageScraper):
         annual = None
         headline = None
         matched_on = None
+
+        # Age band first: closest match this page offers.
+        try:
+            age = int(applicant_data.get("age") or 0)
+        except (TypeError, ValueError):
+            age = 0
+        if age:
+            hit = age_band_premium(text, age)
+            if hit:
+                amount, band, _ = hit
+                return {
+                    "annual_premium": amount,
+                    "headline": (
+                        f"MyChoice's index puts drivers aged {band} at ${amount:,.0f}/yr."
+                    ),
+                    "comparisons": [],
+                    "matched_on": f"age band {band}",
+                    "personalisation": "age",
+                }
 
         # City averages read as "Brampton is the most expensive ... at $3,471".
         if city:
@@ -79,4 +104,5 @@ class MyChoiceIndexScraper(RatePageScraper):
             "headline": headline,
             "comparisons": comparisons,
             "matched_on": matched_on,
+            "personalisation": "city" if matched_on and "city" in matched_on else "province",
         }

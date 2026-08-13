@@ -406,3 +406,40 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+.qc-card__basis {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.qc-card__basis span {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.qc-card__basis .is-personal {
+  color: var(--qt-under, #15803d);
+  border-color: color-mix(in srgb, var(--qt-under, #15803d) 40%, transparent);
+  background: color-mix(in srgb, var(--qt-under, #15803d) 12%, transparent);
+}
+
+.qc-card__basis .is-generic {
+  background: var(--surface-2, var(--code-bg));
+}
+
+.qc-card__basis em {
+  font-style: normal;
+  opacity: 0.8;
+}
+
+.qc-card__limit {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 145%;
+  opacity: 0.8;
+}

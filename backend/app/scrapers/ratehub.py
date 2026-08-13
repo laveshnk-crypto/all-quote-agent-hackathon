@@ -2,13 +2,20 @@
 import re
 from typing import Any, Dict, List
 
-from app.scrapers.rate_page import RatePageScraper, lines_with_money, plausible_annual
+from app.scrapers.rate_page import (
+    RatePageScraper, city_premium, lines_with_money, plausible_annual,
+)
 
 
 class RatehubScraper(RatePageScraper):
     channel_id = "ratehub"
     channel_name = "Ratehub.ca"
     channel_category = "Aggregator"
+
+    limit_note = (
+        "Ratehub publishes regional averages rather than per-driver rates; their own "
+        "quote tool needs contact details."
+    )
 
     city_url_template = "https://www.ratehub.ca/insurance/car/{city}"
     fallback_url = "https://www.ratehub.ca/insurance/car/ontario"
@@ -18,16 +25,25 @@ class RatehubScraper(RatePageScraper):
     ) -> Dict[str, Any]:
         annual = None
         headline = None
+        level = "province"
         comparisons: List[Dict[str, Any]] = []
 
+        # Their city pages list several cities; take the applicant's own.
+        hit = city_premium(text, str(applicant_data.get("city") or "").strip())
+        if hit:
+            annual, headline = hit[0], hit[1]
+            level = "city"
+
         # Ratehub writes averages two ways: "$2,810 per year" and "$2,164 annually".
-        for line in lines_with_money(text, keywords=r"averag|per year|annually"):
+        for line in [] if annual else lines_with_money(text, keywords=r"averag|per year|annually"):
             match = re.search(
                 r"\$\s*(\d[\d,]{2,})\s*(?:per year|annually|a year)", line, re.I
             )
             if match and annual is None:
                 annual = float(match.group(1).replace(",", ""))
                 headline = line[:200]
+                # Ratehub's city pages quote the GTA figure, not the province's.
+                level = "region" if re.search(r"\bGTA\b|Greater Toronto", line, re.I) else "province"
 
         # Monthly city averages ("average monthly rate of $428") -> annualise.
         if annual is None:
@@ -61,5 +77,6 @@ class RatehubScraper(RatePageScraper):
             "annual_premium": annual,
             "headline": headline,
             "comparisons": comparisons,
-            "matched_on": "city page average" if annual else None,
+            "matched_on": ("city page average" if annual else None),
+            "personalisation": level,
         }

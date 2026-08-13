@@ -2,7 +2,9 @@
 import re
 from typing import Any, Dict, List
 
-from app.scrapers.rate_page import RatePageScraper, lines_with_money, plausible_annual
+from app.scrapers.rate_page import (
+    RatePageScraper, city_premium, lines_with_money, plausible_annual,
+)
 
 
 class HelloSafeScraper(RatePageScraper):
@@ -17,7 +19,9 @@ class HelloSafeScraper(RatePageScraper):
     channel_name = "HelloSafe.ca"
     channel_category = "Aggregator"
 
-    city_url_template = None
+    limit_note = "HelloSafe publishes city averages, not per-driver rates."
+
+    city_url_template = "https://hellosafe.ca/en/car-insurance/{city}"
     fallback_url = "https://hellosafe.ca/en/car-insurance/ontario"
 
     required_fields = []
@@ -32,9 +36,17 @@ class HelloSafeScraper(RatePageScraper):
         headline = None
         matched_on = None
 
+        # Their city pages print the figure right after the city name, which the
+        # shared matcher handles; the sentence parsing below is the older path
+        # for pages that list several cities in one line.
+        hit = city_premium(text, city)
+        if hit:
+            annual, headline = hit[0], hit[1]
+            matched_on = f"HelloSafe city average for {city}"
+
         # Prefer a figure for the applicant's own city: HelloSafe lists them as
         # "Toronto, Mississauga and Brampton came in ... at $1,953, $1,971 and $1,976".
-        if city:
+        if city and annual is None:
             for sentence in re.split(r"(?<=[.!?])\s+", flat):
                 if city.lower() not in sentence.lower():
                     continue
@@ -84,4 +96,5 @@ class HelloSafeScraper(RatePageScraper):
             "headline": headline,
             "comparisons": comparisons,
             "matched_on": matched_on,
+            "personalisation": "city" if matched_on and "city" in (matched_on or "") else "province",
         }

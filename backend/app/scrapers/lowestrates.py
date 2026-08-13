@@ -17,6 +17,11 @@ class LowestRatesScraper(RatePageScraper):
     channel_name = "LowestRates.ca"
     channel_category = "Aggregator"
 
+    limit_note = (
+        "Their funnel takes your full vehicle profile, but the priced figure comes "
+        "from their published quote table; the funnel needs contact details to price."
+    )
+
     city_url_template = "https://www.lowestrates.ca/insurance/auto/{city}"
     fallback_url = "https://www.lowestrates.ca/insurance/auto"
 
@@ -248,4 +253,7 @@ class LowestRatesScraper(RatePageScraper):
             "comparisons": comparisons,
             "matched_on": matched,
             "market_average_annual": best["average_annual"],
+            # The quote table is matched on age and vehicle make; the funnel
+            # entry adds twelve more fields but does not change this figure.
+            "personalisation": "age" if best["age"] is not None else "city",
         }

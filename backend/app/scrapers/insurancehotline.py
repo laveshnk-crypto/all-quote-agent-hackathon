@@ -2,7 +2,7 @@
 import re
 from typing import Any, Dict, List
 
-from app.scrapers.rate_page import RatePageScraper, region_for
+from app.scrapers.rate_page import RatePageScraper, age_band_premium, region_for
 
 
 class InsuranceHotlineScraper(RatePageScraper):
@@ -15,6 +15,8 @@ class InsuranceHotlineScraper(RatePageScraper):
     channel_id = "insurancehotline"
     channel_name = "InsuranceHotline.com"
     channel_category = "Broker"
+
+    limit_note = "InsuranceHotline publishes averages by age band and region, not per-driver rates."
 
     city_url_template = None
     fallback_url = "https://www.insurancehotline.com/car-insurance-quotes-ontario"
@@ -41,6 +43,29 @@ class InsuranceHotlineScraper(RatePageScraper):
                 bands[key] = float(match.group(1).replace(",", ""))
                 labels[key] = label
 
+        # Their age table is a closer match than the regional split, so try it first.
+        try:
+            age = int(applicant_data.get("age") or 0)
+        except (TypeError, ValueError):
+            age = 0
+        if age:
+            hit = age_band_premium(text, age)
+            if hit:
+                amount, band, snippet = hit
+                return {
+                    "annual_premium": amount,
+                    "headline": (
+                        f"InsuranceHotline.com puts drivers aged {band} at "
+                        f"${amount:,.0f}/yr."
+                    ),
+                    "comparisons": [
+                        {"label": labels[k], "annual": v, "note": ""}
+                        for k, v in bands.items()
+                    ],
+                    "matched_on": f"age band {band}",
+                    "personalisation": "age",
+                }
+
         if not bands:
             return {"annual_premium": None, "headline": None, "comparisons": []}
 
@@ -65,4 +90,5 @@ class InsuranceHotlineScraper(RatePageScraper):
             "headline": headline,
             "comparisons": comparisons,
             "matched_on": f"{labels[chosen]} (region: {chosen})",
+            "personalisation": "region" if chosen != "province" else "province",
         }

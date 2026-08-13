@@ -96,9 +96,15 @@ Tooling:
 Final response after the quotes come back. Talk the user through it properly -- this is
 the part they waited for, so give it four or five sentences, not one:
 - Start with the best option in the `best` field: name the source, the annual figure and
-  roughly what that is per month, and what coverage level it reflects.
-- Say what that quote was matched on, from `best.matched_on`, so they know how close a fit
-  it is to them. If it was matched on someone materially different -- a much older driver,
+  roughly what that is per month, and what coverage level it reflects. The best option is
+  the cheapest PERSONALISED figure; if some average elsewhere in the list is lower, explain
+  the difference in one sentence rather than switching to it.
+- Say what that quote was matched on, from `best.matched_on` and `best.personalisation_label`,
+  so they know how close a fit it is to them. "Your full profile" is a real quote for them;
+  "Province-wide average" is not, and must never be described as their rate.
+- If any source is flagged `is_generic`, say plainly that it is an average rather than a
+  quote for them, and give its `limit_note` reason in a few words -- a blocked quote form,
+  or a site that only publishes averages. If it was matched on someone materially different -- a much older driver,
   a city-wide average rather than their own profile -- say so plainly. Do not oversell it.
 - Put it in context: how much below the average of all the sources it is, and what the
   spread between cheapest and priciest was. A wide spread is the useful finding, because it
@@ -262,6 +268,12 @@ def _quote_card(result: Dict[str, Any]) -> Dict[str, Any]:
         # Screenshot proof of the page this figure was read from.
         "screenshot_url": result.get("screenshot_url"),
         "is_recommended": result.get("is_recommended", False),
+        # How closely this figure was matched to the applicant, and why it
+        # could not go closer. Shown on the card and in the table.
+        "personalisation": result.get("personalisation"),
+        "personalisation_label": result.get("personalisation_label"),
+        "is_generic": result.get("is_generic", False),
+        "limit_note": result.get("limit_note"),
         "unavailable_reason": (
             None
             if result.get("status") == "SUCCESS"
@@ -742,6 +754,9 @@ class DefaultAgent(Agent):
                     "monthly_premium": best["monthly_premium"],
                     "headline": best["headline"],
                     "matched_on": best["matched_on"],
+                    "personalisation_label": best["personalisation_label"],
+                    "is_generic": best["is_generic"],
+                    "limit_note": best["limit_note"],
                     "coverage": (
                         "comprehensive and collision"
                         if confirmed.get("comprehensive_coverage")
@@ -765,6 +780,9 @@ class DefaultAgent(Agent):
                     "annual_premium": c["annual_premium"],
                     "monthly_premium": c["monthly_premium"],
                     "matched_on": c["matched_on"],
+                    "personalisation_label": c["personalisation_label"],
+                    "is_generic": c["is_generic"],
+                    "limit_note": c["limit_note"],
                     "headline": c["headline"],
                     "unavailable_reason": c["unavailable_reason"],
                 }
