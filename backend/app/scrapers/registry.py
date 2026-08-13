@@ -138,7 +138,11 @@ async def run_all_channels(
                 except Exception:
                     logger.exception("on_result callback failed for %s", result.get("channel_id"))
     finally:
-        await pool.aclose()
+        # Never let teardown throw away results the channels already produced.
+        try:
+            await pool.aclose()
+        except Exception:
+            logger.exception("browser pool did not close cleanly")
 
     # Successes first, cheapest first within that; everything else keeps registry order.
     def sort_key(result: Dict[str, Any]) -> tuple:

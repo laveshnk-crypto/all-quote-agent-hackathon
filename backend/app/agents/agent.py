@@ -103,6 +103,11 @@ the part they waited for, so give it four or five sentences, not one:
 - Mention one or two of the other notable results, especially any regulator or benchmark
   figure, so the best one has something to sit against.
 - Say how many of the ten returned a price, and briefly name any that didn't and why.
+  A few failing is normal -- these are ten live third-party sites. Do not treat a partial
+  run as a failure; the sources that worked are the answer.
+- If the tool comes back NO_PRICES, none of them priced this profile. Say so plainly, give
+  a couple of the reasons from the cards on screen, and offer to try again, since a retry
+  often succeeds. Never present that as a quote of zero or make a number up.
 - Never invent a figure for a source that returned nothing; call it unavailable and move on.
 - Tell them they can swipe the cards, or open the table to compare all ten side by side,
   where the best rate is highlighted in gold and every row links to a screenshot of the
@@ -680,21 +685,41 @@ class DefaultAgent(Agent):
         self.last_quote_results = results
 
         totals = summarise(results)
-        if not totals["channels_with_a_price"]:
-            await self._publish_ui(
-                {"phase": "error", "message": "No source returned a rate for this profile."}
-            )
-            raise ToolError(
-                "All ten channels ran but none returned a price. Reasons: "
-                + "; ".join(
-                    f"{r['channel_name']}: {r.get('evidence_summary', '?')[:80]}"
-                    for r in results
-                )
-                + ". Offer to double-check a detail and try again."
-            )
-
         cards = [_quote_card(r) for r in results]
+
+        # The results screen goes up whatever happened. A partial run is the
+        # normal case -- these are ten independent third-party sites -- and
+        # replacing eight good quotes with an error screen because two failed
+        # throws away the answer the user waited for. Even a total washout shows
+        # the ten cards, each saying what went wrong on that source.
         await self._publish_ui({"phase": "result", "summary": totals, "quotes": cards})
+
+        if not totals["channels_with_a_price"]:
+            logger.warning(
+                "no channel returned a price: %s",
+                {r["channel_id"]: r.get("status") for r in results},
+            )
+            return {
+                "status": "NO_PRICES",
+                "summary": totals,
+                "quotes": [
+                    {
+                        "channel": c["channel_name"],
+                        "status": c["status"],
+                        "reason": c["unavailable_reason"],
+                        "detail": (c["headline"] or "")[:120],
+                    }
+                    for c in cards
+                ],
+                "note": (
+                    "None of the ten returned a figure this time. Their cards are on "
+                    "screen with the reason for each. Tell the user plainly that no "
+                    "source priced them, name a couple of the reasons, and offer to "
+                    "try again -- these are live third-party sites and a retry often "
+                    "succeeds. Do not invent a number."
+                ),
+                "confirmed_details": confirmed,
+            }
 
         # The cards are already on screen, so the spoken payload stays small --
         # except for the winner, which gets the detail needed to talk about it.
