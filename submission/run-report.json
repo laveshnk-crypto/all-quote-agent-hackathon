@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-08-13T02:38:06+00:00",
+  "generated_at": "2026-08-13T03:05:30+00:00",
   "run": {
-    "started": "2026-08-13T02:37:43+00:00",
-    "finished": "2026-08-13T02:38:06+00:00",
-    "wall_clock_seconds": 22.4
+    "started": "2026-08-13T03:04:40+00:00",
+    "finished": "2026-08-13T03:05:30+00:00",
+    "wall_clock_seconds": 49.5
   },
   "profile": {
     "profile_type": "synthetic test fixture -- not a real person",
@@ -14,7 +14,8 @@
     "redactions_applied": [
       "date_of_birth -> age band",
       "postal_code -> forward sortation area (3 chars)",
-      "no name / email / phone / street address (never collected)"
+      "first/last name -> excluded (collected for conversation and the confirmation screen only; never entered on any site, never in artifacts)",
+      "no email / phone / street address (never collected)"
     ]
   },
   "summary": {
@@ -23,9 +24,9 @@
     "channels_unavailable": [],
     "cheapest_annual": 1296.0,
     "cheapest_channel": "Surex.com",
-    "dearest_annual": 3965.0,
-    "average_annual": 2575.25,
-    "spread_annual": 2669.0
+    "dearest_annual": 4282.0,
+    "average_annual": 2601.67,
+    "spread_annual": 2986.0
   },
   "recommended": "hellosafe",
   "ledger": [
@@ -36,7 +37,7 @@
       "personalisation": "province",
       "is_generic": true,
       "matched_on": "closest Ontario quote: Male, 72, Markham \u00b7 2014 TOYOTA SIENNA CE V6",
-      "landed_at_seconds": 20.5
+      "landed_at_seconds": 39.4
     },
     {
       "source_id": "insureye",
@@ -45,7 +46,7 @@
       "personalisation": "province",
       "is_generic": true,
       "matched_on": "Ontario average",
-      "landed_at_seconds": 21.0
+      "landed_at_seconds": 47.2
     },
     {
       "source_id": "hellosafe",
@@ -54,7 +55,7 @@
       "personalisation": "city",
       "is_generic": false,
       "matched_on": "HelloSafe city average for Toronto",
-      "landed_at_seconds": 16.3
+      "landed_at_seconds": 39.6
     },
     {
       "source_id": "isure",
@@ -63,7 +64,7 @@
       "personalisation": "province",
       "is_generic": true,
       "matched_on": "isure Ontario average",
-      "landed_at_seconds": 22.0
+      "landed_at_seconds": 49.3
     },
     {
       "source_id": "ratesupermarket",
@@ -72,7 +73,7 @@
       "personalisation": "province",
       "is_generic": true,
       "matched_on": "Ontario average",
-      "landed_at_seconds": 22.3
+      "landed_at_seconds": 48.1
     },
     {
       "source_id": "mychoice",
@@ -81,7 +82,7 @@
       "personalisation": "profile",
       "is_generic": false,
       "matched_on": "age band 2, HYUNDAI 2021, M5V",
-      "landed_at_seconds": 15.2
+      "landed_at_seconds": 33.4
     },
     {
       "source_id": "mychoice_index",
@@ -90,7 +91,7 @@
       "personalisation": "age",
       "is_generic": false,
       "matched_on": "age band 25-34",
-      "landed_at_seconds": 15.9
+      "landed_at_seconds": 38.4
     },
     {
       "source_id": "rates_ca",
@@ -99,7 +100,7 @@
       "personalisation": "postal",
       "is_generic": false,
       "matched_on": "postal area M5V",
-      "landed_at_seconds": 6.3
+      "landed_at_seconds": 16.0
     },
     {
       "source_id": "ratehub",
@@ -108,7 +109,7 @@
       "personalisation": "region",
       "is_generic": true,
       "matched_on": "city page average",
-      "landed_at_seconds": 5.5
+      "landed_at_seconds": 20.7
     },
     {
       "source_id": "lowestrates",
@@ -117,7 +118,7 @@
       "personalisation": "age",
       "is_generic": false,
       "matched_on": "closest published quote: 39-year-old driver, 2022 HONDA ACCORD SPORT 2.0 4DR",
-      "landed_at_seconds": 14.8
+      "landed_at_seconds": 24.0
     },
     {
       "source_id": "insurancehotline",
@@ -126,16 +127,16 @@
       "personalisation": "age",
       "is_generic": false,
       "matched_on": "age band 30-39",
-      "landed_at_seconds": 10.0
+      "landed_at_seconds": 25.7
     },
     {
       "source_id": "fsra_regulatory_benchmark",
       "status": "SUCCESS",
-      "annual_premium": 3965.0,
+      "annual_premium": 4282.0,
       "personalisation": "profile",
       "is_generic": false,
       "matched_on": "age 30-39, FSA M5V, 10,001-20,000 km",
-      "landed_at_seconds": 11.9
+      "landed_at_seconds": 23.8
     }
   ]
 }

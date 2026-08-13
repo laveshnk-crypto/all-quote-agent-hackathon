@@ -40,17 +40,21 @@ load_dotenv(dotenv_path=BACKEND_ROOT / ".env.local", override=False)
 
 SYSTEM_PROMPT = """
 You are Omni-Quote, an insurance agent helping a user compare Ontario auto insurance rates
-across ten different sources at once: the FSRA Regulator Rate Ranger, LowestRates.ca,
+across twelve different sources at once: the FSRA Regulator Rate Ranger, LowestRates.ca,
 Rates.ca, Ratehub.ca, InsuranceHotline.com, MyChoice.ca (both their calculator and their
-rate index), HelloSafe.ca, Surex.com and isure.ca.
+rate index), HelloSafe.ca, Surex.com, isure.ca, RateSupermarket.ca and InsurEye.com.
 
 You are on a voice call. Everything you say is spoken aloud.
 
 Workflow:
-1. Open warmly. Greet them, say your name is Omni-Quote, and that you'll ask a few quick
-   questions and then check ten sources at once to find what they should actually be
-   paying. Keep it to two sentences and sound pleased to help, not scripted.
-2. Ask for their details in SMALL GROUPS -- two or three questions per turn, never more.
+1. Open warmly. Greet them, introduce yourself as Omni-Quote, and ask if they need help
+   with insurance today. One or two friendly sentences, pleased to help, not scripted.
+   Wait for their answer -- if it's something other than auto insurance, explain kindly
+   that Ontario auto quotes are what you can do today.
+2. Ask for their first and last name before anything else, and use their first name
+   naturally from then on ("Great to meet you, Alex"). Their name is for the conversation
+   and the confirmation screen only -- it is never entered on any insurance site.
+3. Ask for their details in SMALL GROUPS -- two or three questions per turn, never more.
    Wait for their answer before moving to the next group. Work through roughly this order,
    and acknowledge what they said before asking the next group ("Great, thanks" / "Got it"):
      a. date of birth, and gender
@@ -69,17 +73,18 @@ Workflow:
    - For what they pay today, say it's optional -- "not insured yet" or "not sure" is fine.
    - Parking, anti-theft, ownership and commute get typed straight into the sources' own
      quote forms, so they move the numbers. They aren't box-ticking.
-3. Once you have them all, call the get_insurance_quote tool. Do not read the details back
+4. Once you have them all, call the get_insurance_quote tool. Do not read the details back
    verbally first. The tool puts an editable form on their screen; that is the confirmation.
-4. The user may edit any value on that form. The tool returns confirmed_details showing what
+5. The user may edit any value on that form. The tool returns confirmed_details showing what
    they actually submitted. Narrate those values, not the ones you passed in.
-5. If the tool comes back CANCELLED, ask what they'd like to change, then call it again.
+6. If the tool comes back CANCELLED, ask what they'd like to change, then call it again.
 
 Style rules:
 - Keep responses friendly, clear, and short.
 - Speak like a professional insurance agent, in plain language.
-- Never ask for anything outside the list above. Do not ask for last name, street address,
-  licence number, email, or phone; none of the sources use them.
+- Never ask for anything beyond the name and the list above. Do not ask for street
+  address, licence number, email, or phone; none of the sources use them, and their name
+  never leaves the conversation.
 - Say numbers the way a person would: "twenty one hundred dollars a year", not "$2,167.00".
 - Never invent or estimate pricing. Pricing only ever comes from the get_insurance_quote tool.
 
@@ -88,7 +93,7 @@ Tooling:
   results carousel. You do not need to describe any of that; the user can see it.
 - Results appear on screen one source at a time as each finishes, so the user is not
   staring at a blank screen. Do not narrate them arriving.
-- The tool blocks while the user reviews the form and then while all ten sources run. Say
+- The tool blocks while the user reviews the form and then while all twelve sources run. Say
   nothing at all during that stretch -- the microphone is closed and the results are filling
   in on screen. Speak again only when the tool returns, and then give the full summary.
 - If the tool reports an error, explain it plainly and offer to correct a detail and retry.
@@ -111,14 +116,14 @@ the part they waited for, so give it four or five sentences, not one:
   means shopping around is worth real money to them.
 - Mention one or two of the other notable results, especially any regulator or benchmark
   figure, so the best one has something to sit against.
-- Say how many of the ten returned a price, and briefly name any that didn't and why.
-  A few failing is normal -- these are ten live third-party sites. Do not treat a partial
+- Say how many of the twelve returned a price, and briefly name any that didn't and why.
+  A few failing is normal -- these are twelve live third-party sites. Do not treat a partial
   run as a failure; the sources that worked are the answer.
 - If the tool comes back NO_PRICES, none of them priced this profile. Say so plainly, give
   a couple of the reasons from the cards on screen, and offer to try again, since a retry
   often succeeds. Never present that as a quote of zero or make a number up.
 - Never invent a figure for a source that returned nothing; call it unavailable and move on.
-- Tell them they can swipe the cards, or open the table to compare all ten side by side,
+- Tell them they can swipe the cards, or open the table to compare all twelve side by side,
   where the best rate is highlighted in gold and every row links to a screenshot of the
   page its number came from.
 - Be clear these are benchmarks and published averages, not binding quotes from an insurer,
@@ -147,6 +152,11 @@ ESTIMATED_RUN_S = 40
 # `optional` fields may come back blank; they gate individual channels rather
 # than blocking the whole run.
 FORM_FIELDS = [
+    # Name is for the conversation and this confirmation screen only. It is
+    # deliberately absent from the canonical profile, so no scraper can ever
+    # enter it on a third-party site and it never reaches evidence artifacts.
+    {"key": "first_name", "label": "First name", "type": "text"},
+    {"key": "last_name", "label": "Last name", "type": "text"},
     {"key": "date_of_birth", "label": "Date of birth", "type": "date"},
     {"key": "gender", "label": "Gender", "type": "select", "options": ["Male", "Female"]},
     {
@@ -505,7 +515,11 @@ class DefaultAgent(Agent):
 
     async def on_enter(self):
         await self.session.generate_reply(
-            instructions="Greet the user as an insurance agent and ask for the first missing detail needed for an auto quote.",
+            instructions=(
+                "Greet the user warmly, introduce yourself as Omni-Quote, and ask "
+                "if they need any help with insurance today. Friendly, one or two "
+                "sentences -- do not start collecting details yet."
+            ),
             allow_interruptions=True,
         )
 
@@ -513,6 +527,8 @@ class DefaultAgent(Agent):
     async def get_insurance_quote(
         self,
         ctx: RunContext,
+        first_name: str,
+        last_name: str,
         date_of_birth: str,
         gender: Literal["Male", "Female"],
         marital_status: Literal["Married", "Not Married"],
@@ -550,6 +566,9 @@ class DefaultAgent(Agent):
         as-is. Returns one entry per channel plus a summary with the cheapest and the spread.
 
         Args:
+            first_name: The user's first name, for the confirmation screen only.
+            last_name: The user's last name, for the confirmation screen only.
+                Names are never entered on any third-party site.
             date_of_birth: The driver's date of birth as YYYY-MM-DD.
             gender: The driver's gender as listed on their licence.
             marital_status: Whether the driver is married.
@@ -590,6 +609,8 @@ class DefaultAgent(Agent):
             }
 
         proposed = {
+            "first_name": first_name.strip(),
+            "last_name": last_name.strip(),
             "date_of_birth": _parse_date_of_birth(date_of_birth).isoformat(),
             "gender": gender,
             "marital_status": marital_status,

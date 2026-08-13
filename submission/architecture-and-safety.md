@@ -9,7 +9,7 @@ human is required, and how personal data is handled.
 
 | Component | Responsibility |
 | --- | --- |
-| **Voice agent** (`backend/app/agents/agent.py`) | Runs the conversation (2–3 questions per turn, 24 intake fields), exposes exactly one tool (`get_insurance_quote`), publishes UI state over the LiveKit data channel, and narrates results. Guarded against duplicate tool calls (`on_duplicate="reject"` plus an in-tool check), so a second call can never paint over a form being edited. |
+| **Voice agent** (`backend/app/agents/agent.py`) | Runs the conversation (2–3 questions per turn, name first, 26 intake fields), exposes exactly one tool (`get_insurance_quote`), publishes UI state over the LiveKit data channel, and narrates results. Guarded against duplicate tool calls (`on_duplicate="reject"` plus an in-tool check), so a second call can never paint over a form being edited. |
 | **Confirmation UI** (`frontend/src/components/QuoteExperience.jsx`) | Renders the editable form, per-field validation errors, streaming progress, the results carousel and comparison table. Replies to the agent over RPC. |
 | **Canonical profile** (`backend/app/scrapers/profile.py`) | Normalises the confirmed form once into canonical tokens; each scraper translates tokens into its own site's wording via a declared `VALUE_MAP`. No scraper interprets raw user input. |
 | **Orchestrator** (`backend/app/scrapers/registry.py`) | Fans out to all sources concurrently (shared Chromium, 4 pages at a time, 120s per-channel budget measured from work start). One source failing never affects the others. Flags exactly one recommendation — the cheapest **personalised** figure, never a cheaper population average. |
@@ -51,8 +51,11 @@ human is required, and how personal data is handled.
 
 ## Data storage
 
-- **Collected:** the 24 intake fields only. The agent is instructed never to ask for a
-  name, street address, licence number, email or phone, and no scraper needs them.
+- **Collected:** first and last name plus the 24 quoting fields. The name exists for
+  the conversation and the confirmation screen only -- it is deliberately absent from the
+  canonical profile, so no scraper can enter it on a third-party site and it never
+  appears in evidence artifacts or reports. The agent is instructed never to ask for a
+  street address, licence number, email or phone, and no scraper needs them.
 - **Application storage:** none. There is no active database (SQLAlchemy models exist as
   scaffolding but are not wired). The confirmed profile lives in process memory for the
   duration of the session.
@@ -73,8 +76,9 @@ human is required, and how personal data is handled.
   to leave the machine.
 - The run report in this folder was generated from a **synthetic profile**; no real
   person's data exists anywhere in the repository.
-- Identity fields are not redacted so much as **never collected** — the strongest form of
-  redaction available.
+- Names are excluded from every artifact and report at the source; the remaining
+  identity fields (email, phone, street address, licence number) are **never collected**
+  — the strongest form of redaction available.
 
 ## Deletion
 

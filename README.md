@@ -12,7 +12,7 @@ cheapest highlighted, and a screenshot proving each one.
 ## How a call goes
 
 1. **The agent asks.** Two or three questions at a time — date of birth and gender, then
-   postal code and city, then the car, and so on. Twenty-four fields, about ten questions.
+   postal code and city, then the car, and so on. Name first, then twenty-four quoting fields, about ten questions.
 2. **The details go on screen.** An editable form appears and the microphone closes; the
    form *is* the confirmation. Correct anything, hit confirm. A "tap to talk" button is
    there if you'd rather say something.
@@ -104,7 +104,7 @@ deliberately stops before any step that would generate a real broker lead.**
 
 ```
 backend/app/
-  agents/agent.py          the voice agent: prompt, 24-field intake, the one quote tool
+  agents/agent.py          the voice agent: prompt, 26-field intake, the one quote tool
   scrapers/
     registry.py            the ten channels, concurrent fan-out, result ordering
     profile.py             canonical answer format + per-site translation

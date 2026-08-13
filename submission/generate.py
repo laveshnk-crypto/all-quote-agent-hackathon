@@ -51,7 +51,8 @@ REDACTED_PROFILE = {
     "redactions_applied": [
         "date_of_birth -> age band",
         "postal_code -> forward sortation area (3 chars)",
-        "no name / email / phone / street address (never collected)",
+        "first/last name -> excluded (collected for conversation and the confirmation screen only; never entered on any site, never in artifacts)",
+        "no email / phone / street address (never collected)",
     ],
 }
 
