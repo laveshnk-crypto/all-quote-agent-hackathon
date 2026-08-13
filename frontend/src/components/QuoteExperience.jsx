@@ -13,7 +13,8 @@ const QUOTE_VOICE_RPC = 'quote.voice';
 // Baked in at build time by Vite; docker-compose passes it as a build arg.
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8001';
 
-function QuoteForm({ fields, values, onChange, onSubmit, busy }) {
+function QuoteForm({ fields, values, errors = {}, onChange, onSubmit, busy }) {
+  const errorCount = Object.keys(errors).length;
   return (
     <form
       className="quote-card quote-form"
@@ -24,14 +25,20 @@ function QuoteForm({ fields, values, onChange, onSubmit, busy }) {
     >
       <header className="quote-card__head">
         <h2>Confirm your details</h2>
-        <p>Change anything that isn&apos;t right, then confirm to get your rate.</p>
+        <p>
+          {errorCount
+            ? 'Almost there — just fix the highlighted field below.'
+            : "Change anything that isn't right, then confirm to get your rate."}
+        </p>
       </header>
 
       <div className="quote-form__grid">
         {fields.map((field) => (
           <label
             key={field.key}
-            className={`quote-field quote-field--${field.type}`}
+            className={`quote-field quote-field--${field.type} ${
+              errors[field.key] ? 'has-error' : ''
+            }`}
             htmlFor={`qf-${field.key}`}
           >
             <span className="quote-field__label">
@@ -67,7 +74,13 @@ function QuoteForm({ fields, values, onChange, onSubmit, busy }) {
               />
             )}
 
-            {field.hint && <span className="quote-field__hint">{field.hint}</span>}
+            {errors[field.key] ? (
+              <span className="quote-field__error" role="alert">
+                {errors[field.key]}
+              </span>
+            ) : (
+              field.hint && <span className="quote-field__hint">{field.hint}</span>
+            )}
           </label>
         ))}
       </div>
@@ -93,7 +106,17 @@ const money = (value) =>
       }).format(value)
     : null;
 
-function QuoteLoading({ channels = [], done = 0, total = 0, landed = [] }) {
+function QuoteLoading({ channels = [], done = 0, total = 0, landed = [], etaSeconds = 0 }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Once results start landing their actual pace beats the static estimate.
+  const projected = done > 0 ? Math.round((elapsed / done) * total) : etaSeconds;
+  const remaining = Math.max(0, projected - elapsed);
   // Each channel reports as it lands, so the list resolves in place rather than
   // animating a fake sequence. Anything not yet reported stays pending.
   const byName = new Map(landed.map((q) => [q.channel_name, q]));
@@ -109,6 +132,12 @@ function QuoteLoading({ channels = [], done = 0, total = 0, landed = [] }) {
       <h2>Checking {total || channels.length || 'all'} sources</h2>
       <p className="quote-loading__step">
         {done > 0 ? `${done} of ${total} back` : 'Entering your details on each site…'}
+      </p>
+      <p className="quote-loading__eta">
+        {remaining > 0
+          ? `about ${remaining < 60 ? `${remaining}s` : `${Math.ceil(remaining / 60)} min`} left`
+          : 'finishing up…'}
+        <span> · {elapsed}s elapsed</span>
       </p>
 
       {channels.length > 0 && (
@@ -178,6 +207,20 @@ export default function QuoteExperience() {
     }
 
     setUi(payload);
+    if (payload.phase === 'form') {
+      const seeded = { ...(payload.values ?? {}) };
+      for (const field of payload.fields ?? []) {
+        if (field.type !== 'select') continue;
+        // Without this the browser shows option one while React state holds '',
+        // so an untouched dropdown submits empty and bounces the whole form back.
+        if (!field.options?.includes(seeded[field.key])) {
+          seeded[field.key] = field.options?.[0] ?? '';
+        }
+      }
+      setValues(seeded);
+      setBusy(false);
+      return;
+    }
     if (payload.phase === 'loading') {
       setLanded([]);
       setProgress({ done: 0, total: (payload.channels ?? []).length });
@@ -256,6 +299,7 @@ export default function QuoteExperience() {
           <QuoteForm
             fields={ui.fields ?? []}
             values={values}
+            errors={ui.errors ?? {}}
             onChange={handleChange}
             onSubmit={handleSubmit}
             busy={busy}
@@ -268,6 +312,7 @@ export default function QuoteExperience() {
             done={progress.done}
             total={progress.total || (ui.channels ?? []).length}
             landed={landed}
+            etaSeconds={ui.eta_seconds ?? 0}
           />
         );
       case 'result':

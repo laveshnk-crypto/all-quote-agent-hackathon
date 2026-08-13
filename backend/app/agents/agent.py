@@ -3,7 +3,7 @@ import json
 import logging
 import os
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -122,6 +122,12 @@ QUOTE_UI_TOPIC = "quote.ui"
 QUOTE_SUBMIT_RPC = "quote.submit"
 QUOTE_VOICE_RPC = "quote.voice"
 FORM_TIMEOUT_S = 300.0
+
+# What we tell the user the lookup will take. Measured runs land between about
+# 35s and 80s depending on how the sites are responding, so quote the pessimistic
+# end -- a lookup that beats its estimate reads as fast, one that overruns reads
+# as broken.
+ESTIMATED_RUN_S = 90
 
 # Drives both the on-screen form and the coercion of whatever comes back from it.
 # `optional` fields may come back blank; they gate individual channels rather
@@ -256,12 +262,21 @@ def _quote_card(result: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+class FormValidationError(Exception):
+    """A field came back unusable. Carries which one, so the form can say so."""
+
+    def __init__(self, field: str, message: str) -> None:
+        self.field = field
+        self.message = message
+        super().__init__(f"{field}: {message}")
+
+
 def _coerce_form_values(raw: Dict[str, Any]) -> Dict[str, Any]:
     """Normalise values coming back from HTML inputs, which arrive as strings."""
     values: Dict[str, Any] = {}
 
     for field in FORM_FIELDS:
-        key, label, kind = field["key"], field["label"], field["type"]
+        key, kind = field["key"], field["type"]
         optional = field.get("optional", False)
         value = raw.get(key)
         blank = value is None or str(value).strip() == ""
@@ -271,11 +286,11 @@ def _coerce_form_values(raw: Dict[str, Any]) -> Dict[str, Any]:
                 if optional:
                     values[key] = None
                     continue
-                raise ToolError(f"'{label}' came back empty. Ask the user to fill it in.")
+                raise FormValidationError(key, "Needs a number")
             try:
                 values[key] = int(float(str(value).strip()))
             except (TypeError, ValueError):
-                raise ToolError(f"'{label}' needs to be a whole number. Ask the user to fix it.")
+                raise FormValidationError(key, "Whole numbers only")
         elif kind == "boolean":
             values[key] = (
                 value
@@ -288,11 +303,9 @@ def _coerce_form_values(raw: Dict[str, Any]) -> Dict[str, Any]:
                 if optional:
                     values[key] = None
                     continue
-                raise ToolError(f"'{label}' came back empty. Ask the user to fill it in.")
+                raise FormValidationError(key, "This one is needed")
             if kind == "select" and text not in field["options"]:
-                raise ToolError(
-                    f"'{label}' must be one of {', '.join(field['options'])}. Ask the user to fix it."
-                )
+                raise FormValidationError(key, f"Pick one of: {', '.join(field['options'])}")
             values[key] = text
 
     return values
@@ -401,12 +414,47 @@ class DefaultAgent(Agent):
             json.dumps(payload), topic=QUOTE_UI_TOPIC, reliable=True
         )
 
-    async def _await_form_confirmation(self, values: Dict[str, Any]) -> Dict[str, Any]:
+    async def _collect_confirmed_details(self, proposed: Dict[str, Any]) -> Dict[str, Any]:
+        """Show the form until we get values that actually validate, or a cancel.
+
+        A bad field used to raise out to the model, which would call the tool
+        again and paint a brand new empty-looking form -- the user saw the same
+        form twice with no idea what was wrong. Now the same form comes back with
+        the offending field marked, and the run continues from there.
+        """
+        values = dict(proposed)
+        errors: Dict[str, str] = {}
+
+        for _ in range(4):
+            submission = await self._await_form_confirmation(values, errors)
+
+            if submission.get("action") != "confirm":
+                return {"cancelled": True}
+
+            values = {**values, **(submission.get("values") or {})}
+            try:
+                return {"confirmed": _coerce_form_values(values)}
+            except FormValidationError as exc:
+                errors = {exc.field: exc.message}
+                logger.info("form validation: %s", exc)
+
+        return {"cancelled": True, "reason": "too many invalid submissions"}
+
+    async def _await_form_confirmation(
+        self, values: Dict[str, Any], errors: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         """Put the form on screen and block until the user confirms, edits, or cancels."""
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending_form = future
 
-        await self._publish_ui({"phase": "form", "fields": FORM_FIELDS, "values": values})
+        await self._publish_ui(
+            {
+                "phase": "form",
+                "fields": FORM_FIELDS,
+                "values": values,
+                "errors": errors or {},
+            }
+        )
         # Nothing said out loud can help while the form is being edited, and an
         # open mic here just feeds room noise to the transcriber.
         await self.set_voice_input(False, reason="form on screen")
@@ -531,9 +579,9 @@ class DefaultAgent(Agent):
             "change anything that's off, and hit confirm when it looks right."
         )
 
-        submission = await self._await_form_confirmation(proposed)
+        outcome = await self._collect_confirmed_details(proposed)
 
-        if submission.get("action") != "confirm":
+        if outcome.get("cancelled"):
             await self._publish_ui({"phase": "idle"})
             return {
                 "status": "CANCELLED",
@@ -541,7 +589,7 @@ class DefaultAgent(Agent):
                 "would like to change, then call this tool again.",
             }
 
-        confirmed = _coerce_form_values(submission.get("values", {}))
+        confirmed = outcome["confirmed"]
         dob = _parse_date_of_birth(confirmed["date_of_birth"])
 
         applicant_data = {
@@ -575,11 +623,17 @@ class DefaultAgent(Agent):
 
         # Ten channels, each driving a browser, run concurrently.
         await self._publish_ui(
-            {"phase": "loading", "channels": [c["channel_name"] for c in channel_directory()]}
+            {
+                "phase": "loading",
+                "channels": [c["channel_name"] for c in channel_directory()],
+                "eta_seconds": ESTIMATED_RUN_S,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
         )
         ctx.session.say(
-            "Perfect. I'm checking ten different sources for you now — "
-            "this takes a minute or two."
+            "Perfect. I'm entering your details on ten different sites now — "
+            "it usually takes about a minute and a half. Results will appear on "
+            "screen as each one comes back."
         )
 
         logger.info("running all channels for profile: %s", applicant_data)

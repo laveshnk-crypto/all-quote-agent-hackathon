@@ -442,3 +442,48 @@
     animation: none;
   }
 }
+
+.quote-loading__eta {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.quote-loading__eta span {
+  color: var(--text);
+  opacity: 0.75;
+}
+
+/* A field the backend rejected. */
+.quote-field.has-error input,
+.quote-field.has-error select {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.quote-field__error {
+  font-size: 11.5px;
+  color: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .quote-field.has-error input,
+  :root:not([data-theme='light']) .quote-field.has-error select {
+    border-color: #f87171;
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.14);
+  }
+  :root:not([data-theme='light']) .quote-field__error {
+    color: #f87171;
+  }
+}
+
+:root[data-theme='dark'] .quote-field.has-error input,
+:root[data-theme='dark'] .quote-field.has-error select {
+  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.14);
+}
+
+:root[data-theme='dark'] .quote-field__error {
+  color: #f87171;
+}

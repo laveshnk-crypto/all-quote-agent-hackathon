@@ -40,8 +40,15 @@ SCRAPERS: List[Type[BaseScraper]] = [
     IsureScraper,
 ]
 
-# A single channel is allowed this long before we give up on it.
-CHANNEL_TIMEOUT_S = 90.0
+# How long a channel gets *once it starts working*. This deliberately excludes
+# time spent queued for a browser slot: measuring from task creation meant the
+# channels behind the queue spent their whole budget waiting and every one of
+# them timed out together, which is the opposite of a per-channel timeout.
+CHANNEL_TIMEOUT_S = 120.0
+
+# Channels actively driving a browser at once. The rest queue for a slot, and
+# their clock does not start until they get one.
+CHANNEL_CONCURRENCY = 6
 
 
 def channel_directory() -> List[Dict[str, Any]]:
@@ -62,15 +69,24 @@ async def _run_one(
     applicant_data: Dict[str, Any],
     screenshot_dir: Optional[str],
     pool: Optional[BrowserPool] = None,
+    gate: Optional[asyncio.Semaphore] = None,
 ) -> Dict[str, Any]:
     kwargs: Dict[str, Any] = {"pool": pool}
     if screenshot_dir:
         kwargs["screenshot_dir"] = screenshot_dir
     scraper = cls(**kwargs)
     try:
-        return await asyncio.wait_for(
-            scraper.execute(applicant_data), timeout=CHANNEL_TIMEOUT_S
-        )
+        # Queue for a slot *outside* the timeout, so the clock measures this
+        # channel's own work rather than how busy the others were.
+        if gate is not None:
+            await gate.acquire()
+        try:
+            return await asyncio.wait_for(
+                scraper.execute(applicant_data), timeout=CHANNEL_TIMEOUT_S
+            )
+        finally:
+            if gate is not None:
+                gate.release()
     except asyncio.TimeoutError:
         logger.warning("%s timed out after %ss", cls.channel_id, CHANNEL_TIMEOUT_S)
         return scraper.build_result(
@@ -102,12 +118,15 @@ async def run_all_channels(
     """
     selected = [c for c in SCRAPERS if not only or c.channel_id in only]
     total = len(selected)
-    pool = BrowserPool()
+    # The pool no longer gates concurrency; the registry does, so that queueing
+    # happens before a channel's timeout starts.
+    pool = BrowserPool(concurrency=len(selected) or 1)
+    gate = asyncio.Semaphore(CHANNEL_CONCURRENCY)
     results: List[Dict[str, Any]] = []
 
     try:
         pending = [
-            asyncio.create_task(_run_one(cls, applicant_data, screenshot_dir, pool))
+            asyncio.create_task(_run_one(cls, applicant_data, screenshot_dir, pool, gate))
             for cls in selected
         ]
         for done in asyncio.as_completed(pending):
