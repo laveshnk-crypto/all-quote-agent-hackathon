@@ -103,7 +103,20 @@ class RatePageScraper(BaseScraper):
                 # dead waiting on a page that was never going to have one.
                 if await field.count() == 0:
                     continue
-                await field.first.fill(postal, timeout=2500)
+                target = field.first
+                # Frame the box before shooting it. Without this the "entry
+                # proof" was a screenshot of whatever part of the page happened
+                # to be scrolled into view, which proves nothing was entered.
+                await target.scroll_into_view_if_needed(timeout=2000)
+                await target.fill(postal, timeout=2500)
+                # fill() sets the value without firing the events these sites
+                # validate on -- Rates.ca leaves its submit button disabled after
+                # a fill but enables it after real keystrokes. Nudging the same
+                # events keeps the field in the state the site expects.
+                await target.evaluate(
+                    "el => { el.dispatchEvent(new Event('input', {bubbles:true}));"
+                    " el.dispatchEvent(new Event('change', {bubbles:true})); }"
+                )
                 await page.wait_for_timeout(250)
                 await self.capture_entry(page, "postal")
                 return {"entered": {"postal_code": postal}, "selector": selector}

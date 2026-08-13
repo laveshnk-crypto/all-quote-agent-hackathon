@@ -6,6 +6,24 @@ from app.scrapers.rate_page import RatePageScraper, lines_with_money, plausible_
 
 
 class RatesCaScraper(RatePageScraper):
+    """Rates.ca, read from their published city rate pages.
+
+    Their live quote funnel is not usable, and this is worth writing down so it
+    is not re-attempted. Entering a postal code on rates.ca and pressing "Get My
+    Quote" hands off to ``quotes.rates.ca/autoquote``, which answers **HTTP 403**
+    behind a Cloudflare "Verify you are human" challenge. It does not clear on
+    its own -- checked repeatedly over 36 seconds -- and getting past it would
+    mean defeating a bot-protection control, which this project does not do.
+
+    Note the postal box also needs real key events: ``fill()`` sets the value but
+    leaves the submit button ``disabled``, because the site enables it from
+    keystrokes. Typing works. That only matters if someone revisits this.
+
+    So this channel reads the city page, which is public, un-gated, and carries
+    the figure we actually want: the city's average annual premium plus a ranked
+    table of neighbouring cities.
+    """
+
     channel_id = "rates_ca"
     channel_name = "Rates.ca"
     channel_category = "Aggregator"
