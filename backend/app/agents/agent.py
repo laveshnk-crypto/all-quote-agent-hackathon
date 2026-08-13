@@ -89,8 +89,9 @@ Style rules:
 - Never invent or estimate pricing. Pricing only ever comes from the get_insurance_quote tool.
 
 Tooling:
-- get_insurance_quote handles the on-screen confirmation form, the loading state, and the
-  results carousel. You do not need to describe any of that; the user can see it.
+- get_insurance_quote runs ONCE per call. After it returns results it is removed from
+  your tools; never attempt a second call. It handles the on-screen confirmation form,
+  the loading state, and the results carousel -- you do not need to describe any of that.
 - Results appear on screen one source at a time as each finishes, so the user is not
   staring at a blank screen. Do not narrate them arriving.
 - The tool blocks while the user reviews the form and then while all twelve sources run. Say
@@ -128,8 +129,10 @@ the part they waited for, so give it four or five sentences, not one:
   page its number came from.
 - Be clear these are benchmarks and published averages, not binding quotes from an insurer,
   and that an actual policy needs a real application.
-- Offer to re-run with different details, such as lower mileage, a garage, or added
-  discounts, and say the mic is open again.
+- Say the mic is open again and offer to answer questions about any of the figures on
+  screen. The quote tool is finished for this call once results are shown -- it is removed
+  and calling it again is impossible. If they want to try different details, tell them to
+  hang up and start a fresh call with the bot button.
 """
 
 
@@ -381,6 +384,10 @@ class DefaultAgent(Agent):
         # Resolved by the browser's RPC reply while a form is on screen.
         self._pending_form: Optional[asyncio.Future] = None
         self._voice_enabled = True
+        # Set once a run has produced results. The quote tool is retired at
+        # that point, so the model cannot re-open the confirmation form over
+        # the results the user is looking at.
+        self._quote_complete = False
         # Full per-channel payloads from the most recent run, including artifact paths.
         self.last_quote_results: Optional[List[Dict[str, Any]]] = None
 
@@ -408,6 +415,29 @@ class DefaultAgent(Agent):
                 )
             )
         return json.dumps({"ok": True, "enabled": enable})
+
+    async def _retire_quote_tool(self) -> None:
+        """Remove get_insurance_quote from the toolset after a completed run.
+
+        The duplicate guards only stop a second call while the form is open;
+        once results were returned, nothing stopped the model calling the tool
+        again and painting a fresh form over them. Removing the tool makes
+        that impossible rather than merely discouraged -- the model no longer
+        has it. EndCall stays, so the user can still hang up.
+        """
+        self._quote_complete = True
+        try:
+            from livekit.agents.llm.tool_context import get_function_info, is_function_tool
+
+            remaining = [
+                t for t in self.tools
+                if not (is_function_tool(t) and get_function_info(t).name == "get_insurance_quote")
+            ]
+            await self.update_tools(remaining)
+            logger.info("quote tool retired; remaining tools: %d", len(remaining))
+        except Exception:
+            # The flag guard below still makes a stray call a no-op.
+            logger.exception("could not retire the quote tool")
 
     async def set_voice_input(self, enabled: bool, *, reason: str = "") -> None:
         """Open or close the mic, and tell the UI which it is.
@@ -597,6 +627,17 @@ class DefaultAgent(Agent):
             multi_vehicle_discount: True if more than one vehicle is insured with the same company.
             multi_policy_discount: True if another policy (home, tenant) is with the same company.
         """
+        # Once a run has completed, this tool is finished for the call. The
+        # results are on screen; re-running would replace them with a form.
+        if self._quote_complete:
+            return {
+                "status": "COMPLETE",
+                "note": "The quote run already finished and the results are on "
+                "screen. Do not call this tool again this call. Answer questions "
+                "from the results you already have; for a fresh run with different "
+                "details, the user starts a new call.",
+            }
+
         # A second call while a form is already on screen would paint a fresh
         # form over the one the user is filling in, and orphan the first tool
         # call's future -- which is what "it asked me again" looked like.
@@ -730,6 +771,11 @@ class DefaultAgent(Agent):
         # throws away the answer the user waited for. Even a total washout shows
         # the ten cards, each saying what went wrong on that source.
         await self._publish_ui({"phase": "result", "summary": totals, "quotes": cards})
+
+        # Results are up: this tool's work is done for the rest of the call.
+        # NO_PRICES is the exception below -- a retry is its documented recovery.
+        if totals["channels_with_a_price"]:
+            await self._retire_quote_tool()
 
         if not totals["channels_with_a_price"]:
             logger.warning(
