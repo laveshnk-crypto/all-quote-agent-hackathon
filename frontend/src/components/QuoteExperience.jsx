@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDataChannel, useRoomContext, useVoiceAssistant } from '@livekit/components-react';
 
 import lucideBot from '../assets/lucide--bot.svg';
@@ -180,6 +180,17 @@ export default function QuoteExperience() {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [voiceEnabled, setVoiceEnabled] = useState(true);
 
+  // The data-channel callback closes over the first render, so read live state
+  // through refs rather than stale captures. Synced in an effect, not during
+  // render, which React forbids.
+  const valuesRef = useRef(values);
+  const uiPhaseRef = useRef(ui.phase);
+
+  useEffect(() => {
+    valuesRef.current = values;
+    uiPhaseRef.current = ui.phase;
+  }, [values, ui.phase]);
+
   useDataChannel(QUOTE_UI_TOPIC, (msg) => {
     let payload;
     try {
@@ -209,6 +220,9 @@ export default function QuoteExperience() {
     setUi(payload);
     if (payload.phase === 'form') {
       const seeded = { ...(payload.values ?? {}) };
+      // A form arriving while one is already up is a duplicate, not a new step.
+      // Keep what the user has typed rather than resetting the fields under them.
+      if (uiPhaseRef.current === 'form') Object.assign(seeded, valuesRef.current);
       for (const field of payload.fields ?? []) {
         if (field.type !== 'select') continue;
         // Without this the browser shows option one while React state holds '',
@@ -226,10 +240,6 @@ export default function QuoteExperience() {
       setProgress({ done: 0, total: (payload.channels ?? []).length });
     }
     if (payload.phase === 'result') setView('cards');
-    if (payload.phase === 'form') {
-      setValues(payload.values ?? {});
-      setBusy(false);
-    }
   });
 
   const agentIdentity =

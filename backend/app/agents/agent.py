@@ -406,6 +406,11 @@ class DefaultAgent(Agent):
         except json.JSONDecodeError:
             return json.dumps({"accepted": False, "reason": "malformed payload"})
 
+        logger.info(
+            "form submitted: action=%s fields=%d",
+            payload.get("action"),
+            len(payload.get("values") or {}),
+        )
         future.set_result(payload)
         return json.dumps({"accepted": True})
 
@@ -447,6 +452,12 @@ class DefaultAgent(Agent):
         future: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending_form = future
 
+        # Logged every time so a repeat "it asked me again" can be traced to the
+        # cause: a second form with errors is validation, a second with none is a
+        # duplicate tool call.
+        logger.info(
+            "publishing form (errors=%s)", list((errors or {}).keys()) or "none"
+        )
         await self._publish_ui(
             {
                 "phase": "form",
@@ -478,7 +489,7 @@ class DefaultAgent(Agent):
             allow_interruptions=True,
         )
 
-    @function_tool
+    @function_tool(on_duplicate="reject", duplicate_scope="name")
     async def get_insurance_quote(
         self,
         ctx: RunContext,
@@ -547,6 +558,17 @@ class DefaultAgent(Agent):
             multi_vehicle_discount: True if more than one vehicle is insured with the same company.
             multi_policy_discount: True if another policy (home, tenant) is with the same company.
         """
+        # A second call while a form is already on screen would paint a fresh
+        # form over the one the user is filling in, and orphan the first tool
+        # call's future -- which is what "it asked me again" looked like.
+        if self._pending_form is not None and not self._pending_form.done():
+            logger.warning("get_insurance_quote called while a form is already open")
+            return {
+                "status": "ALREADY_OPEN",
+                "note": "Their details are already on screen waiting to be confirmed. "
+                "Say nothing further and wait for them to press confirm.",
+            }
+
         proposed = {
             "date_of_birth": _parse_date_of_birth(date_of_birth).isoformat(),
             "gender": gender,
