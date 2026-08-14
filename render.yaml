@@ -34,7 +34,7 @@ services:
       # Must match the agent_name the worker registers under (see
       # backend/.env.example for why a mismatch fails silently).
       - key: LIVEKIT_AGENT_NAME
-        value: assistant-1-ge-1
+        value: assistant-1177
       # Comma-separated frontend origins allowed by CORS. Update in the Render
       # dashboard if the deployed frontend lands on a different domain.
       - key: ALLOWED_ORIGINS
