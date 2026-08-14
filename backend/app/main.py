@@ -19,17 +19,18 @@ ARTIFACT_DIR = Path(__file__).resolve().parent / "scrapers" / "screenshots"
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ALLOWED_ORIGINS is a comma-separated list of frontend origins (scheme + host,
-# no trailing slash). Unset means local development against the Vite dev server.
-_default_origins = "http://localhost:5173,http://localhost:5174"
-ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
-    if origin.strip()
-]
+# no trailing slash). Unset means local development, where Vite hops to the next
+# free port when 5173 is taken -- so dev accepts any localhost port rather than
+# pinning a list that goes stale the moment a second dev server is running.
+_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+ALLOWED_ORIGINS = [o.strip() for o in _origins_env.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=(
+        None if ALLOWED_ORIGINS else r"http://(localhost|127\.0\.0\.1)(:\d+)?"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
